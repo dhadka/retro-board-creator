@@ -227,7 +227,7 @@ async function createBoard(
     return ''
   }
 
-  const columnNames = ['Action items!', 'Shoutouts', 'Could be better', 'Good']
+  const columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!']
   const columnMap: { [name: string]: number } = {}
 
   for (const name of columnNames) {

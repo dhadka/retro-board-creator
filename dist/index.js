@@ -9141,7 +9141,7 @@ function createBoard(client, title, date, team, currentDriver, lastRetro, nextDr
         if (!project) {
             return '';
         }
-        const columnNames = ['Action items!', 'Shoutouts', 'Could be better', 'Good'];
+        const columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
         const columnMap = {};
         for (const name of columnNames) {
             const column = yield client.projects.createColumn({
