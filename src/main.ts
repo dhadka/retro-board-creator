@@ -19,6 +19,8 @@ async function run(): Promise<void> {
       ),
       retroCadenceInWeeks: parseInt(core.getInput('retro-cadence-weeks')) ?? 1,
       retroDayOfWeek: parseInt(core.getInput('retro-day-of-week')) ?? 5,
+      retroTitle: core.getInput('retro-title'),
+      startOn: new Date(core.getInput('start-on') ?? '01/01/2010'),
       onlyLog: core.getInput('only-log') === 'true'
     }
 

@@ -7,6 +7,8 @@ export interface IRetroArguments {
   handles: string[]
   retroCadenceInWeeks: number
   retroDayOfWeek: number
+  retroTitle: string
+  startOn: Date
   onlyLog: boolean
 }
 
@@ -16,7 +18,11 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   core.info('Looking for latest retro date...')
 
   // find the last retro
-  const lastRetroOn: Date = await findLatestRetroDate(client, args.teamName)
+  const lastRetroOn: Date = await findLatestRetroDate(
+    client,
+    args.startOn,
+    args.teamName
+  )
 
   core.info(`Last retro created on: ${lastRetroOn}`)
 
@@ -40,13 +46,22 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   core.info(`Next retro date calculated as: ${retroDate}`)
 
   // who is driving the retro?
-  const nextRetroDriver = whoIsNext(args.handles, args.retroCadenceInWeeks)
+  const nextRetroDriver = whoIsNext(
+    args.handles,
+    args.retroCadenceInWeeks,
+    args.startOn
+  )
 
   core.info(`Retro driver is: ${nextRetroDriver}`)
 
   if (!args.onlyLog) {
     // create the project board
-    const projectUrl = await createBoard(client, retroDate)
+    const projectUrl = await createBoard(
+      client,
+      args.retroTitle,
+      retroDate,
+      args.teamName
+    )
 
     // create the issue
     await createTrackingIssue(client, projectUrl, nextRetroDriver)
@@ -58,11 +73,14 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
 }
 
 // figure who is running the next retro based on the list
-function whoIsNext(handles: string[], retroCadenceInWeeks: number): string {
+function whoIsNext(
+  handles: string[],
+  retroCadenceInWeeks: number,
+  startOn: Date
+): string {
   // choose an arbitrary day to start with
-  const firstWeek = new Date('01/01/2010')
   const today = new Date()
-  const diff = today.getTime() - firstWeek.getTime()
+  const diff = today.getTime() - startOn.getTime()
   const daysSince = Math.floor(diff / (1000 * 60 * 60 * 24))
   core.info(`Days since: ${daysSince}`)
   const retrosSince = Math.floor(daysSince / (7 * retroCadenceInWeeks))
@@ -75,12 +93,21 @@ function whoIsNext(handles: string[], retroCadenceInWeeks: number): string {
   return nxt
 }
 
+function getRetroBodyPrefix(teamName: string): string {
+  if (teamName) {
+    return `${teamName} Retro on `
+  } else {
+    return `Retro on `
+  }
+}
+
 // look at all of the repo projects and give back the last retro date
 async function findLatestRetroDate(
   client: github.GitHub,
-  teamName: string = ''
+  startOn: Date,
+  teamName: string
 ): Promise<Date> {
-  const retroBodyStart = teamName ? `${teamName} Retro on ` : 'Retro on '
+  const retroBodyStart = getRetroBodyPrefix(teamName)
 
   const projects = await client.projects.listForRepo({
     owner: github.context.repo.owner,
@@ -99,7 +126,7 @@ async function findLatestRetroDate(
   core.info(`Found ${sorted.length} retro projects for this repo`)
 
   const defaultRetroDate = new Date()
-  defaultRetroDate.setDate(defaultRetroDate.getDate() - 7) // 1 week in the past to ensure we create a new retro
+  defaultRetroDate.setDate(startOn.getDate() - 7) // 1 week in the past to ensure we create a new retro
 
   // return the latest or today's date
   return sorted.length > 0 ? new Date(sorted[0]) : defaultRetroDate
@@ -135,22 +162,38 @@ function nextRetroDate(
   return nextDate
 }
 
-// create the retro board and return the URL
-async function createBoard(
-  client: github.GitHub,
-  retroDate: Date
-): Promise<string> {
+function getFullRetroTitle(
+  retroTitle: string,
+  retroDate: Date,
+  teamName: string
+): string {
   const readableDate = retroDate.toLocaleDateString('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric'
   })
 
+  if (retroTitle) {
+    return `${retroTitle}${readableDate}`
+  } else if (teamName) {
+    return `${teamName} Retro on ${readableDate}`
+  } else {
+    return `Retrospective - Week of ${readableDate}`
+  }
+}
+
+// create the retro board and return the URL
+async function createBoard(
+  client: github.GitHub,
+  retroTitle: string,
+  retroDate: Date,
+  teamName: string
+): Promise<string> {
   const project = await client.projects.createForRepo({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
-    name: `Retrospective - Week of ${readableDate}`,
-    body: `Retro on ${retroDate}`
+    name: getFullRetroTitle(retroTitle, retroDate, teamName),
+    body: `${getRetroBodyPrefix(teamName)}${retroDate}`
   })
 
   if (!project) {

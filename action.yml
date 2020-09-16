@@ -10,13 +10,17 @@ inputs:
     required: true
   team-name:
     description: 'Team name for the retro.'
-    required: false
   retro-cadence-weeks:
     description: 'How often are your retros, in weeks?'
     default: 1
   retro-day-of-week:
     description: 'The day of the week to schedule a retro on. Default is Friday.'
     default: 5
+  retro-title:
+    description: 'Custom title for the retro.'
+  start-on:
+    description: 'Starting date for team retros.'
+    default: '01/01/2010'
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
     default: false
