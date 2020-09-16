@@ -18,9 +18,8 @@ inputs:
     default: 5
   retro-title:
     description: 'Custom title for the retro.'
-  start-on:
-    description: 'Starting date for team retros.'
-    default: '01/01/2010'
+  notification-url:
+    description: 'Slack incoming webhooks URL to send notifications the day of the retro.'
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
     default: false
