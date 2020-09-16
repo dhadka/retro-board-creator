@@ -3517,7 +3517,7 @@ function parseCommaSeparatedString(s) {
     return s.split(',').map(l => l.trim());
 }
 function run() {
-    var _a, _b, _c;
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Starting retro creator');
         try {
@@ -3528,7 +3528,6 @@ function run() {
                 retroCadenceInWeeks: (_a = parseInt(core.getInput('retro-cadence-weeks')), (_a !== null && _a !== void 0 ? _a : 1)),
                 retroDayOfWeek: (_b = parseInt(core.getInput('retro-day-of-week')), (_b !== null && _b !== void 0 ? _b : 5)),
                 retroTitle: core.getInput('retro-title'),
-                startOn: new Date((_c = core.getInput('start-on'), (_c !== null && _c !== void 0 ? _c : '01/01/2010'))),
                 onlyLog: core.getInput('only-log') === 'true'
             };
             core.info('Arguments parsed. Starting creation.');
@@ -7401,7 +7400,7 @@ function tryCreateRetro(args) {
         const client = new github.GitHub(args.repoToken);
         core.info('Looking for latest retro date...');
         // find the last retro
-        const lastRetroOn = yield findLatestRetroDate(client, args.startOn, args.teamName);
+        const lastRetroOn = yield findLatestRetroDate(client, args.teamName);
         core.info(`Last retro created on: ${lastRetroOn}`);
         // should we create a retro or did it already get created?
         const diff = lastRetroOn.getTime() - new Date().getTime();
@@ -7415,7 +7414,7 @@ function tryCreateRetro(args) {
         const retroDate = nextRetroDate(lastRetroOn, args.retroDayOfWeek, args.retroCadenceInWeeks);
         core.info(`Next retro date calculated as: ${retroDate}`);
         // who is driving the retro?
-        const nextRetroDriver = whoIsNext(args.handles, args.retroCadenceInWeeks, args.startOn);
+        const nextRetroDriver = whoIsNext(args.handles, args.retroCadenceInWeeks);
         core.info(`Retro driver is: ${nextRetroDriver}`);
         if (!args.onlyLog) {
             // create the project board
@@ -7430,10 +7429,11 @@ function tryCreateRetro(args) {
 }
 exports.tryCreateRetro = tryCreateRetro;
 // figure who is running the next retro based on the list
-function whoIsNext(handles, retroCadenceInWeeks, startOn) {
+function whoIsNext(handles, retroCadenceInWeeks) {
     // choose an arbitrary day to start with
+    const firstWeek = new Date('01/01/2010');
     const today = new Date();
-    const diff = today.getTime() - startOn.getTime();
+    const diff = today.getTime() - firstWeek.getTime();
     const daysSince = Math.floor(diff / (1000 * 60 * 60 * 24));
     core.info(`Days since: ${daysSince}`);
     const retrosSince = Math.floor(daysSince / (7 * retroCadenceInWeeks));
@@ -7453,7 +7453,7 @@ function getRetroBodyPrefix(teamName) {
     }
 }
 // look at all of the repo projects and give back the last retro date
-function findLatestRetroDate(client, startOn, teamName) {
+function findLatestRetroDate(client, teamName) {
     return __awaiter(this, void 0, void 0, function* () {
         const retroBodyStart = getRetroBodyPrefix(teamName);
         const projects = yield client.projects.listForRepo({
@@ -7469,7 +7469,7 @@ function findLatestRetroDate(client, startOn, teamName) {
             .reverse();
         core.info(`Found ${sorted.length} retro projects for this repo`);
         const defaultRetroDate = new Date();
-        defaultRetroDate.setDate(startOn.getDate() - 7); // 1 week in the past to ensure we create a new retro
+        defaultRetroDate.setDate(defaultRetroDate.getDate() - 7); // 1 week in the past to ensure we create a new retro
         // return the latest or today's date
         return sorted.length > 0 ? new Date(sorted[0]) : defaultRetroDate;
     });

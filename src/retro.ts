@@ -8,7 +8,6 @@ export interface IRetroArguments {
   retroCadenceInWeeks: number
   retroDayOfWeek: number
   retroTitle: string
-  startOn: Date
   onlyLog: boolean
 }
 
@@ -18,11 +17,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   core.info('Looking for latest retro date...')
 
   // find the last retro
-  const lastRetroOn: Date = await findLatestRetroDate(
-    client,
-    args.startOn,
-    args.teamName
-  )
+  const lastRetroOn: Date = await findLatestRetroDate(client, args.teamName)
 
   core.info(`Last retro created on: ${lastRetroOn}`)
 
@@ -46,11 +41,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   core.info(`Next retro date calculated as: ${retroDate}`)
 
   // who is driving the retro?
-  const nextRetroDriver = whoIsNext(
-    args.handles,
-    args.retroCadenceInWeeks,
-    args.startOn
-  )
+  const nextRetroDriver = whoIsNext(args.handles, args.retroCadenceInWeeks)
 
   core.info(`Retro driver is: ${nextRetroDriver}`)
 
@@ -73,14 +64,11 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
 }
 
 // figure who is running the next retro based on the list
-function whoIsNext(
-  handles: string[],
-  retroCadenceInWeeks: number,
-  startOn: Date
-): string {
+function whoIsNext(handles: string[], retroCadenceInWeeks: number): string {
   // choose an arbitrary day to start with
+  const firstWeek = new Date('01/01/2010')
   const today = new Date()
-  const diff = today.getTime() - startOn.getTime()
+  const diff = today.getTime() - firstWeek.getTime()
   const daysSince = Math.floor(diff / (1000 * 60 * 60 * 24))
   core.info(`Days since: ${daysSince}`)
   const retrosSince = Math.floor(daysSince / (7 * retroCadenceInWeeks))
@@ -104,7 +92,6 @@ function getRetroBodyPrefix(teamName: string): string {
 // look at all of the repo projects and give back the last retro date
 async function findLatestRetroDate(
   client: github.GitHub,
-  startOn: Date,
   teamName: string
 ): Promise<Date> {
   const retroBodyStart = getRetroBodyPrefix(teamName)
@@ -126,7 +113,7 @@ async function findLatestRetroDate(
   core.info(`Found ${sorted.length} retro projects for this repo`)
 
   const defaultRetroDate = new Date()
-  defaultRetroDate.setDate(startOn.getDate() - 7) // 1 week in the past to ensure we create a new retro
+  defaultRetroDate.setDate(defaultRetroDate.getDate() - 7) // 1 week in the past to ensure we create a new retro
 
   // return the latest or today's date
   return sorted.length > 0 ? new Date(sorted[0]) : defaultRetroDate

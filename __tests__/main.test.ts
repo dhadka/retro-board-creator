@@ -7,7 +7,6 @@ const DefaultArgs: IRetroArguments = {
   retroCadenceInWeeks: 1,
   retroDayOfWeek: 5,
   retroTitle: '',
-  startOn: new Date('01/01/2010'),
   onlyLog: true
 }
 
