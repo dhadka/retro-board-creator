@@ -8,12 +8,18 @@ inputs:
   handles:
     description: 'The message to post on the issue when tagging it. If none provided, will not mark issues stale.'
     required: true
+  team-name:
+    description: 'Team name for the retro.'
   retro-cadence-weeks:
     description: 'How often are your retros, in weeks?'
     default: 1
   retro-day-of-week:
     description: 'The day of the week to schedule a retro on. Default is Friday.'
     default: 5
+  retro-title:
+    description: 'Custom title for the retro.'
+  notification-url:
+    description: 'Slack incoming webhooks URL to send notifications the day of the retro.'
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
     default: false

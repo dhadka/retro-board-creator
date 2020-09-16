@@ -1,8 +1,11 @@
-<p align="center">
-  <a href="https://github.com/actions/typescript-action/actions"><img alt="retro-board-creator status" src="https://github.com/hross/retro-board-creator/workflows/build-test/badge.svg"></a>
-</p>
+# Retrobot
 
-# Creating Retro Boards
+Retrobot is based heavily off of [c2c-actions-runtime's retro board creator](https://github.com/hross/retro-board-creator), with the following major differences:
+
+1. Adds optional `team-name` input for distinguishing multiple teams using the same repo.
+2. Encodes team name, retro date, and retro driver in the project body. Reads this information to determine the next retro date and driver.
+3. Automatically adds cards pointing to the last retro and identifying the next retro driver.
+4. Assuming the workflow schedule is configured correctly, sends a slack notification about the retro.
 
 ```
 name: Create the Retrospective Board
