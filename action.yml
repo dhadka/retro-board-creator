@@ -8,6 +8,9 @@ inputs:
   handles:
     description: 'The message to post on the issue when tagging it. If none provided, will not mark issues stale.'
     required: true
+  team-name:
+    description: 'Team name for the retro.'
+    required: false
   retro-cadence-weeks:
     description: 'How often are your retros, in weeks?'
     default: 1

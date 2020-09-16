@@ -13,6 +13,7 @@ async function run(): Promise<void> {
   try {
     const args: IRetroArguments = {
       repoToken: core.getInput('repo-token', {required: true}),
+      teamName: core.getInput('team-name'),
       handles: parseCommaSeparatedString(
         core.getInput('handles', {required: true})
       ),

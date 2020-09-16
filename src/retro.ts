@@ -3,6 +3,7 @@ import * as github from '@actions/github'
 
 export interface IRetroArguments {
   repoToken: string
+  teamName: string
   handles: string[]
   retroCadenceInWeeks: number
   retroDayOfWeek: number
@@ -15,7 +16,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   core.info('Looking for latest retro date...')
 
   // find the last retro
-  const lastRetroOn: Date = await findLatestRetroDate(client)
+  const lastRetroOn: Date = await findLatestRetroDate(client, args.teamName)
 
   core.info(`Last retro created on: ${lastRetroOn}`)
 
@@ -75,8 +76,11 @@ function whoIsNext(handles: string[], retroCadenceInWeeks: number): string {
 }
 
 // look at all of the repo projects and give back the last retro date
-async function findLatestRetroDate(client: github.GitHub): Promise<Date> {
-  const retroBodyStart = 'Retro on '
+async function findLatestRetroDate(
+  client: github.GitHub,
+  teamName: string = ''
+): Promise<Date> {
+  const retroBodyStart = teamName ? `${teamName} Retro on ` : 'Retro on '
 
   const projects = await client.projects.listForRepo({
     owner: github.context.repo.owner,
