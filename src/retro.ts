@@ -99,8 +99,8 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     args.retroCadenceInWeeks
   )
 
-  const currentRetroDriver = nextDriver(args.handles, lastRetroDriver)
-  const nextRetroDriver = nextDriver(args.handles, currentRetroDriver)
+  const nextRetroDriver = nextDriver(args.handles, lastRetroDriver)
+  const futureRetroDriver = nextDriver(args.handles, nextRetroDriver)
 
   core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`)
 
@@ -110,9 +110,9 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
       args.retroTitle,
       nextRetroDate,
       args.teamName,
-      currentRetroDriver,
+      nextRetroDriver,
       lastRetro,
-      nextRetroDriver
+      futureRetroDriver
     )
 
     //await createTrackingIssue(client, projectUrl, nextRetroDriver)

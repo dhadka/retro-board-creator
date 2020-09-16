@@ -9053,11 +9053,11 @@ function tryCreateRetro(args) {
         const lastRetroDate = lastRetro ? lastRetro.date : new Date();
         const lastRetroDriver = lastRetro ? lastRetro.driver : '';
         const nextRetroDate = nextDate(lastRetroDate, args.retroDayOfWeek, args.retroCadenceInWeeks);
-        const currentRetroDriver = nextDriver(args.handles, lastRetroDriver);
-        const nextRetroDriver = nextDriver(args.handles, currentRetroDriver);
+        const nextRetroDriver = nextDriver(args.handles, lastRetroDriver);
+        const futureRetroDriver = nextDriver(args.handles, nextRetroDriver);
         core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`);
         if (!args.onlyLog) {
-            const projectUrl = yield createBoard(client, args.retroTitle, nextRetroDate, args.teamName, currentRetroDriver, lastRetro, nextRetroDriver);
+            const projectUrl = yield createBoard(client, args.retroTitle, nextRetroDate, args.teamName, nextRetroDriver, lastRetro, futureRetroDriver);
             //await createTrackingIssue(client, projectUrl, nextRetroDriver)
         }
         else {
