@@ -109,7 +109,11 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   )
 
   if (!args.onlyLog) {
-    if (lastRetro && args.closeAfter > 0 && lastRetro.date < newDate(-args.closeAfter)) {
+    if (
+      lastRetro &&
+      args.closeAfter > 0 &&
+      lastRetro.date < newDate(-args.closeAfter)
+    ) {
       await closeBoard(client, lastRetro)
       core.info(`Closed previous retro from ${lastRetro.date}`)
     }
@@ -244,13 +248,10 @@ function getFullRetroTitle(
   }
 }
 
-async function closeBoard(
-  client: github.GitHub,
-  retro: IRetro
-): Promise<void> {
+async function closeBoard(client: github.GitHub, retro: IRetro): Promise<void> {
   await client.projects.update({
     project_id: retro.projectId,
-    state: "closed"
+    state: 'closed'
   })
 }
 
@@ -324,7 +325,15 @@ async function createTrackingIssue(
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
     title: title,
-    body: `Hey @${retroDriver},\n\nYou are scheduled to drive the next retro on ${retroDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.\n\nBest Regards,\nRetrobot`
+    body: `Hey @${retroDriver},
+    
+You are scheduled to drive the next retro on ${retroDate}.
+The retro board has been created at ${projectUrl}.
+Please remind the team beforehand to fill out their cards.
+
+Best Regards,
+
+Retrobot`
   })
 
   await client.issues.addAssignees({

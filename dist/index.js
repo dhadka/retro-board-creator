@@ -4316,7 +4316,7 @@ function parseCommaSeparatedString(s) {
     return s.split(',').map(l => l.trim());
 }
 function run() {
-    var _a, _b;
+    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Starting retro creator');
         try {
@@ -4328,6 +4328,7 @@ function run() {
                 retroDayOfWeek: (_b = parseInt(core.getInput('retro-day-of-week')), (_b !== null && _b !== void 0 ? _b : 5)),
                 retroTitle: core.getInput('retro-title'),
                 notificationUrl: core.getInput('notification-url'),
+                closeAfter: (_c = parseInt(core.getInput('close-after')), (_c !== null && _c !== void 0 ? _c : 0)),
                 onlyLog: core.getInput('only-log') === 'true'
             };
             core.info('Arguments parsed. Starting creation.');
@@ -8992,13 +8993,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const axios_1 = __importDefault(__webpack_require__(53));
-const bodyPrefix = "Retrobot: ";
+const bodyPrefix = 'Retrobot: ';
 function toRetroBody(team, date, driver) {
-    return bodyPrefix + JSON.stringify({
-        team: team,
-        date: date,
-        driver: driver
-    });
+    return (bodyPrefix +
+        JSON.stringify({
+            team: team,
+            date: date,
+            driver: driver
+        }));
 }
 function parseRetroBody(info) {
     if (info.startsWith(bodyPrefix)) {
@@ -9016,10 +9018,10 @@ function parseRetroBody(info) {
 function sendNotification(notificationUrl, retro) {
     return __awaiter(this, void 0, void 0, function* () {
         let body = {
-            'username': 'Upcoming Retro',
-            'text': `Visit ${retro.url} to add your cards.`,
-            'icon_emoji': ':pickachu-dance:',
-            'link_names': 1
+            username: 'Upcoming Retro',
+            text: `A retro is scheduled for today! Visit ${retro.url} to add your cards. @${retro.driver} will be driving today's retro.`,
+            icon_emoji: ':pickachu-dance:',
+            link_names: 1
         };
         let res = yield axios_1.default.post(notificationUrl, body);
         console.log(res);
@@ -9028,28 +9030,21 @@ function sendNotification(notificationUrl, retro) {
 function tryCreateRetro(args) {
     return __awaiter(this, void 0, void 0, function* () {
         const client = new github.GitHub(args.repoToken);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        core.info('Looking for latest retro date...');
-        // find the last retro
+        const today = newDate(0, true);
+        const tomorrow = newDate(1, true);
         const lastRetro = yield findLatestRetro(client, args.teamName);
-        // If there is a retro and it's in the future, handle it.
-        if (lastRetro) {
-            if (lastRetro.date > today && lastRetro.date < tomorrow) {
-                core.info("Retro happening today, sending notification");
+        // If there is already a scheduled retro in the future...
+        if (lastRetro && lastRetro.date > today) {
+            core.info(`Retro scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`);
+            if (lastRetro.date < tomorrow) {
+                core.info('Retro happening today, sending notification');
                 if (!args.onlyLog) {
                     sendNotification(args.notificationUrl, lastRetro);
                 }
-                return;
             }
-            else if (lastRetro.date > today) {
-                core.info("Retro hasn't happened yet, skip creating a new one");
-                return;
-            }
+            return;
         }
-        // Otherwise, there is a retro in the past or no retro at all. Create a new one.
+        // Otherwise, the scheduled retro is in the past or no retro found...
         const lastRetroDate = lastRetro ? lastRetro.date : new Date();
         const lastRetroDriver = lastRetro ? lastRetro.driver : '';
         const nextRetroDate = nextDate(lastRetroDate, args.retroDayOfWeek, args.retroCadenceInWeeks);
@@ -9057,8 +9052,16 @@ function tryCreateRetro(args) {
         const futureRetroDriver = nextDriver(args.handles, nextRetroDriver);
         core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`);
         if (!args.onlyLog) {
+            if (lastRetro &&
+                args.closeAfter > 0 &&
+                lastRetro.date < newDate(-args.closeAfter)) {
+                yield closeBoard(client, lastRetro);
+                core.info(`Closed previous retro from ${lastRetro.date}`);
+            }
             const projectUrl = yield createBoard(client, args.retroTitle, nextRetroDate, args.teamName, nextRetroDriver, lastRetro, futureRetroDriver);
-            //await createTrackingIssue(client, projectUrl, nextRetroDriver)
+            core.info(`Created retro board at ${projectUrl}`);
+            const issueUrl = yield createTrackingIssue(client, projectUrl, getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName), nextRetroDate, nextRetroDriver);
+            core.info(`Created tracking issue at ${issueUrl}`);
         }
         else {
             core.info(`Skipping project/issue creation because we are running in log mode only.`);
@@ -9075,24 +9078,25 @@ function nextDriver(handles, lastDriver) {
         return handles[0];
     }
 }
-// look at all of the repo projects and give back the last retro
 function findLatestRetro(client, teamName) {
     return __awaiter(this, void 0, void 0, function* () {
+        core.info('Locating the last retro...');
         const projects = yield client.projects.listForRepo({
             owner: github.context.repo.owner,
             repo: github.context.repo.repo
         });
+        core.info(`Found ${projects.data.length} projects in this repo`);
         const parseRetro = (proj) => {
             const info = parseRetroBody(proj.body);
             return {
                 title: proj.name,
                 url: proj.html_url,
+                projectId: proj.id,
                 date: info.date,
                 team: info.team,
                 driver: info.driver
             };
         };
-        core.info(`Found ${projects.data.length} for this repo`);
         const sorted = projects.data
             .filter(proj => proj.body.startsWith(bodyPrefix))
             .map(proj => parseRetro(proj))
@@ -9100,6 +9104,14 @@ function findLatestRetro(client, teamName) {
         core.info(`Found ${sorted.length} retro projects for this repo`);
         return sorted.length > 0 ? sorted[0] : undefined;
     });
+}
+function newDate(offsetDays = 0, atMidnight = false) {
+    let date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    if (atMidnight) {
+        date.setHours(0, 0, 0, 0);
+    }
+    return date;
 }
 function nextDate(lastRetroDate, retroDayOfWeek, retroCadenceInWeeks) {
     let nextDate = new Date(lastRetroDate);
@@ -9113,12 +9125,15 @@ function nextDate(lastRetroDate, retroDayOfWeek, retroCadenceInWeeks) {
     nextDate.setDate(nextDate.getDate() + daysToAdd);
     return nextDate;
 }
-function getFullRetroTitle(retroTitle, retroDate, teamName) {
-    const readableDate = retroDate.toLocaleDateString('en-US', {
+function toReadableDate(date) {
+    return date.toLocaleDateString('en-US', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
     });
+}
+function getFullRetroTitle(retroTitle, retroDate, teamName) {
+    const readableDate = toReadableDate(retroDate);
     if (retroTitle) {
         return `${retroTitle}${readableDate}`;
     }
@@ -9129,7 +9144,14 @@ function getFullRetroTitle(retroTitle, retroDate, teamName) {
         return `Retro on ${readableDate}`;
     }
 }
-// create the retro board and return the URL
+function closeBoard(client, retro) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield client.projects.update({
+            project_id: retro.projectId,
+            state: 'closed'
+        });
+    });
+}
 function createBoard(client, title, date, team, currentDriver, lastRetro, nextDriver) {
     return __awaiter(this, void 0, void 0, function* () {
         const project = yield client.projects.createForRepo({
@@ -9141,7 +9163,12 @@ function createBoard(client, title, date, team, currentDriver, lastRetro, nextDr
         if (!project) {
             return '';
         }
-        const columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
+        const columnNames = [
+            'Went well',
+            'Went meh',
+            'Could have gone better',
+            'Action items!'
+        ];
         const columnMap = {};
         for (const name of columnNames) {
             const column = yield client.projects.createColumn({
@@ -9150,39 +9177,49 @@ function createBoard(client, title, date, team, currentDriver, lastRetro, nextDr
             });
             columnMap[name] = column.data.id;
         }
+        yield client.projects.createCard({
+            column_id: columnMap['Action items!'],
+            note: `Today's retro driver: ${currentDriver}`
+        });
+        yield client.projects.createCard({
+            column_id: columnMap['Action items!'],
+            note: `Next retro driver: ${nextDriver}`
+        });
         if (lastRetro) {
             yield client.projects.createCard({
                 column_id: columnMap['Action items!'],
                 note: `Last retro: ${lastRetro.url}`
             });
         }
-        yield client.projects.createCard({
-            column_id: columnMap['Action items!'],
-            note: `Next retro driver: ${nextDriver}`
-        });
         return project.data.html_url;
     });
 }
-// // create a tracking issue for the retro
-// async function createTrackingIssue(
-//   client: github.GitHub,
-//   projectUrl: string,
-//   retroDriver: string
-// ): Promise<number> {
-//   const issue = await client.issues.create({
-//     owner: github.context.repo.owner,
-//     repo: github.context.repo.repo,
-//     title: `The next retro driver is @${retroDriver}`,
-//     body: `Hey @${retroDriver} please remind everyone to fill out the retrospective board at ${projectUrl}`
-//   })
-//   await client.issues.addAssignees({
-//     owner: github.context.repo.owner,
-//     repo: github.context.repo.repo,
-//     issue_number: issue.data.number,
-//     assignees: [retroDriver]
-//   })
-//   return issue.data.number
-// }
+function createTrackingIssue(client, projectUrl, title, retroDate, retroDriver) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const readableDate = toReadableDate(retroDate);
+        const issue = yield client.issues.create({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            title: title,
+            body: `Hey @${retroDriver},
+    
+You are scheduled to drive the next retro on ${retroDate}.
+The retro board has been created at ${projectUrl}.
+Please remind the team beforehand to fill out their cards.
+
+Best Regards,
+
+Retrobot`
+        });
+        yield client.issues.addAssignees({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            issue_number: issue.data.number,
+            assignees: [retroDriver]
+        });
+        return issue.data.html_url;
+    });
+}
 
 
 /***/ }),
