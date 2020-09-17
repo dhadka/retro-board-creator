@@ -8,6 +8,7 @@ Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/
 4. Initializes the retro board with cards showing the current driver, the next driver, and a link to the last retro.
 5. Option to send slack notifications on the day of the retro.
 6. Option to close prior retro boards.
+7. Option to customize the retro board columns.
 
 ## Example workflow
 
@@ -20,7 +21,6 @@ on:
 
 jobs:
   create-board:
-    runs-on: ubuntu-latest
     steps:
     - uses: dhadka/retrobot@master
       with: 
@@ -43,6 +43,8 @@ jobs:
 **`close-after-days`** - When set, the previous retro board will be automatically closed after the given number of days.
 
 **`create-tracking-issue`** - If `true`, will create a tracking issue for the upcoming retro and assign it to the driver.  Default is `false`.
+
+**`columns`** - Comma separated list of column names. If not specified, defaults to `"Went well", "Went meh", "Could have gone better", Action items!"`.  The last column is prepopulated with cards indicating the current and next retro driver.
 
 **`only-log`** - Log what actions would be performed, but do not actually create the retro board, issue, or notifications.  Useful for testing.
 

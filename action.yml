@@ -25,6 +25,8 @@ inputs:
   create-tracking-issue:
     description: 'If true, creates a tracking issue and assigns to the retro driver.'
     default: false
+  columns:
+    description: 'The columns to create.'
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
     default: false

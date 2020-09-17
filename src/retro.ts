@@ -13,6 +13,7 @@ export interface IRetroArguments {
   notificationUrl: string
   closeAfterDays: number
   createTrackingIssue: boolean
+  columns: string[]
   onlyLog: boolean
 }
 
@@ -52,8 +53,8 @@ function parseRetroBody(info: string): IRetroInfo {
 
 async function sendNotification(notificationUrl: string, retro: IRetro) {
   let body = {
-    username: 'Upcoming Retro',
-    text: `A retro is scheduled for today! Visit ${retro.url} to add your cards. @${retro.driver} will be driving today's retro.`,
+    username: 'Retrobot',
+    text: `A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
     icon_emoji: ':pickachu-dance:',
     link_names: 1
   }
@@ -64,7 +65,7 @@ async function sendNotification(notificationUrl: string, retro: IRetro) {
 
 export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   if (!args.handles.length) {
-    throw Error("requires at least one handle")
+    throw Error('requires at least one handle')
   }
 
   const client = new github.GitHub(args.repoToken)
@@ -132,7 +133,8 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
         offset: args.handles.indexOf(nextRetroDriver)
       },
       lastRetro,
-      futureRetroDriver
+      futureRetroDriver,
+      args.columns
     )
 
     core.info(`Created retro board at ${projectUrl}`)
@@ -280,7 +282,8 @@ async function createBoard(
   title: string,
   retroInfo: IRetroInfo,
   lastRetro: IRetro | undefined,
-  nextDriver: string
+  nextDriver: string,
+  columnNames: string[]
 ): Promise<string> {
   const project = await client.projects.createForRepo({
     owner: github.context.repo.owner,
@@ -293,40 +296,46 @@ async function createBoard(
     return ''
   }
 
-  const columnNames = [
-    'Went well',
-    'Went meh',
-    'Could have gone better',
-    'Action items!'
-  ]
+  if (!columnNames) {
+    columnNames = [
+      'Went well',
+      'Went meh',
+      'Could have gone better',
+      'Action items!'
+    ]
+  }
 
-  const columnMap: {[name: string]: number} = {}
+  let lastColumnId: number | undefined = undefined
 
-  for (const name of columnNames) {
+  for (let name of columnNames) {
     const column = await client.projects.createColumn({
       project_id: project.data.id,
       name
     })
 
-    columnMap[name] = column.data.id
+    lastColumnId = column.data.id
   }
 
-  if (lastRetro) {
+  if (lastColumnId) {
+    if (lastRetro) {
+      await client.projects.createCard({
+        column_id: lastColumnId,
+        note: `Last retro: ${lastRetro.url}`
+      })
+    }
+
     await client.projects.createCard({
-      column_id: columnMap['Action items!'],
-      note: `Last retro: ${lastRetro.url}`
+      column_id: lastColumnId,
+      note: `Next retro driver: ${nextDriver}`
     })
+
+    await client.projects.createCard({
+      column_id: lastColumnId,
+      note: `Today's retro driver: ${retroInfo.driver}`
+    })
+  } else {
+    core.info('No columns created so no cards added')
   }
-
-  await client.projects.createCard({
-    column_id: columnMap['Action items!'],
-    note: `Next retro driver: ${nextDriver}`
-  })
-
-  await client.projects.createCard({
-    column_id: columnMap['Action items!'],
-    note: `Today's retro driver: ${retroInfo.driver}`
-  })
 
   return project.data.html_url
 }

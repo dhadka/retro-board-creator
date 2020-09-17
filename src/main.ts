@@ -3,7 +3,7 @@ import * as core from '@actions/core'
 import {IRetroArguments, tryCreateRetro} from './retro'
 
 function parseCommaSeparatedString(s: string): string[] {
-  if (!s.length) return []
+  if (!s) return []
   return s.split(',').map(l => l.trim())
 }
 
@@ -23,6 +23,7 @@ async function run(): Promise<void> {
       notificationUrl: core.getInput('notification-url'),
       closeAfterDays: parseInt(core.getInput('close-after-days')) ?? 0,
       createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
+      columns: parseCommaSeparatedString(core.getInput('columns')),
       onlyLog: core.getInput('only-log') === 'true'
     }
 

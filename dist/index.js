@@ -4311,7 +4311,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const retro_1 = __webpack_require__(478);
 function parseCommaSeparatedString(s) {
-    if (!s.length)
+    if (!s)
         return [];
     return s.split(',').map(l => l.trim());
 }
@@ -4330,6 +4330,7 @@ function run() {
                 notificationUrl: core.getInput('notification-url'),
                 closeAfterDays: (_c = parseInt(core.getInput('close-after-days')), (_c !== null && _c !== void 0 ? _c : 0)),
                 createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
+                columns: parseCommaSeparatedString(core.getInput('columns')),
                 onlyLog: core.getInput('only-log') === 'true'
             };
             core.info('Arguments parsed. Starting creation.');
@@ -9015,8 +9016,8 @@ function parseRetroBody(info) {
 function sendNotification(notificationUrl, retro) {
     return __awaiter(this, void 0, void 0, function* () {
         let body = {
-            username: 'Upcoming Retro',
-            text: `A retro is scheduled for today! Visit ${retro.url} to add your cards. @${retro.driver} will be driving today's retro.`,
+            username: 'Retrobot',
+            text: `A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
             icon_emoji: ':pickachu-dance:',
             link_names: 1
         };
@@ -9027,7 +9028,7 @@ function sendNotification(notificationUrl, retro) {
 function tryCreateRetro(args) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!args.handles.length) {
-            throw Error("requires at least one handle");
+            throw Error('requires at least one handle');
         }
         const client = new github.GitHub(args.repoToken);
         const today = newDate(0, true);
@@ -9064,7 +9065,7 @@ function tryCreateRetro(args) {
                 team: args.teamName,
                 driver: nextRetroDriver,
                 offset: args.handles.indexOf(nextRetroDriver)
-            }, lastRetro, futureRetroDriver);
+            }, lastRetro, futureRetroDriver, args.columns);
             core.info(`Created retro board at ${projectUrl}`);
             if (args.createTrackingIssue) {
                 const issueUrl = yield createTrackingIssue(client, projectUrl, getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName), nextRetroDate, nextRetroDriver);
@@ -9167,7 +9168,7 @@ function closeBoard(client, retro) {
         });
     });
 }
-function createBoard(client, title, retroInfo, lastRetro, nextDriver) {
+function createBoard(client, title, retroInfo, lastRetro, nextDriver, columnNames) {
     return __awaiter(this, void 0, void 0, function* () {
         const project = yield client.projects.createForRepo({
             owner: github.context.repo.owner,
@@ -9178,34 +9179,41 @@ function createBoard(client, title, retroInfo, lastRetro, nextDriver) {
         if (!project) {
             return '';
         }
-        const columnNames = [
-            'Went well',
-            'Went meh',
-            'Could have gone better',
-            'Action items!'
-        ];
-        const columnMap = {};
-        for (const name of columnNames) {
+        if (!columnNames) {
+            columnNames = [
+                'Went well',
+                'Went meh',
+                'Could have gone better',
+                'Action items!'
+            ];
+        }
+        let lastColumnId = undefined;
+        for (let name of columnNames) {
             const column = yield client.projects.createColumn({
                 project_id: project.data.id,
                 name
             });
-            columnMap[name] = column.data.id;
+            lastColumnId = column.data.id;
         }
-        if (lastRetro) {
+        if (lastColumnId) {
+            if (lastRetro) {
+                yield client.projects.createCard({
+                    column_id: lastColumnId,
+                    note: `Last retro: ${lastRetro.url}`
+                });
+            }
             yield client.projects.createCard({
-                column_id: columnMap['Action items!'],
-                note: `Last retro: ${lastRetro.url}`
+                column_id: lastColumnId,
+                note: `Next retro driver: ${nextDriver}`
+            });
+            yield client.projects.createCard({
+                column_id: lastColumnId,
+                note: `Today's retro driver: ${retroInfo.driver}`
             });
         }
-        yield client.projects.createCard({
-            column_id: columnMap['Action items!'],
-            note: `Next retro driver: ${nextDriver}`
-        });
-        yield client.projects.createCard({
-            column_id: columnMap['Action items!'],
-            note: `Today's retro driver: ${retroInfo.driver}`
-        });
+        else {
+            core.info('No columns created so no cards added');
+        }
         return project.data.html_url;
     });
 }
