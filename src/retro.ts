@@ -17,52 +17,75 @@ export interface IRetroArguments {
   onlyLog: boolean
 }
 
-type IRetro = IRetroInfo & {
-  title: string
-  url: string
-  projectId: number
-}
-
+/**
+ * Stores information about a retro.  This information is encoded as JSON in the
+ * project board description.
+ */
 interface IRetroInfo {
+  /**
+   * The team name.
+   */
   team: string
+
+  /**
+   * The retro date.
+   */
   date: Date
+
+  /**
+   * The retro driver GitHub handle.
+   */
   driver: string
+
+  /**
+   * The offset number for the current retro driver.
+   */
   offset: number
 }
 
-const bodyPrefix = 'Retrobot: '
+/**
+ * Extends {@link IRetroInfo} to include information about the existing
+ * project board.
+ */
+type IRetro = IRetroInfo & {
+  /**
+   * The title of the retro.
+   */
+  title: string
 
-function toRetroBody(info: IRetroInfo): string {
-  return bodyPrefix + JSON.stringify(info)
+  /**
+   * The URL to the project board.
+   */
+  url: string
+
+  /**
+   * The project board id used by the GitHub client.
+   */
+  projectId: number
 }
 
-function parseRetroBody(info: string): IRetroInfo {
-  if (info.startsWith(bodyPrefix)) {
-    let content = JSON.parse(info.substring(bodyPrefix.length))
-
-    return {
-      team: content['team'],
-      date: new Date(content['date']),
-      driver: content['driver'],
-      offset: parseInt(content['offset'])
-    }
-  } else {
-    throw Error(`not a valid retro body: ${info}`)
-  }
-}
-
-async function sendNotification(notificationUrl: string, retro: IRetro) {
-  let body = {
-    username: 'Retrobot',
-    text: `<!here|here> A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
-    icon_emoji: ':rocket:',
-    link_names: 1
-  }
-
-  let res = await axios.post(notificationUrl, body)
-  console.log(res)
-}
-
+/**
+ * Performs all the functionality to create the retros, including:
+ *
+ * 1. Determining if the retro already exists and, if necessary, creating a new one.
+ * 2. Opening an tracking issue and assigning to the retro driver.
+ * 3. Sending a slack notification the day of the retro.
+ * 4. Closing old retros.
+ *
+ * In order to fully utilize all this functionality, this script should be invoked
+ * once a day before the scheduled retro time.  For example, if the retro is
+ * scheduled on Wednesdays at 2 PM EST, the GitHub Actions workflow could, for example,
+ * use:
+ *
+ * ```
+ * on:
+ *   schedule:
+ *     - cron: '0 14 * * *'
+ * ```
+ *
+ * to run every day at 10 AM EST, which is when any notifications will be sent.  If the
+ * workflow is scheduled multiple times a day, multiple notifications may be sent.
+ */
 export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   if (!args.handles.length) {
     throw Error('requires at least one handle')
@@ -127,7 +150,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
 
     const projectUrl = await createBoard(
       client,
-      args.retroTitle,
+      getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
       {
         date: nextRetroDate,
         team: args.teamName,
@@ -159,6 +182,14 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   }
 }
 
+/**
+ * Determines the next retro driver.  Retro drivers are selected in the order they appear
+ * in the list of GitHub handles.
+ *
+ * @param handles array of GitHub handles
+ * @param lastDriver the GitHub handle of the last retro driver, or '' if no previous retros found
+ * @param lastOffset the offset of the last retro driver
+ */
 export function nextDriver(
   handles: string[],
   lastDriver: string,
@@ -178,6 +209,51 @@ export function nextDriver(
   }
 }
 
+/**
+ * Prefix used in the project board description to identify projects created
+ * by this code.
+ */
+const bodyPrefix = 'Retrobot: '
+
+/**
+ * Encodes an IRetroInfo object into a string that can be stored in the
+ * project board description or elsewhere.
+ *
+ * @param info the IRetroInfo object to encode
+ */
+function toProjectDescription(info: IRetroInfo): string {
+  return bodyPrefix + JSON.stringify(info)
+}
+
+/**
+ * Parses a string containing an encoded IRetroInfo object that was produced
+ * by {@link toProjectDescription}.
+ *
+ * @param info the string representation
+ * @returns the parsed IRetroInfo object
+ */
+function parseProjectDescription(info: string): IRetroInfo {
+  if (info.startsWith(bodyPrefix)) {
+    const content = JSON.parse(info.substring(bodyPrefix.length))
+
+    return {
+      team: content['team'],
+      date: new Date(content['date']),
+      driver: content['driver'],
+      offset: parseInt(content['offset'])
+    }
+  } else {
+    throw Error(`not a valid retro body: ${info}`)
+  }
+}
+
+/**
+ * Finds the last retro.
+ *
+ * @param client the GitHub client
+ * @param teamName the team name, or '' if not defined
+ * @returns information about the last retro, or undefined if no matching retro found
+ */
 async function findLatestRetro(
   client: github.GitHub,
   teamName: string
@@ -194,7 +270,7 @@ async function findLatestRetro(
   const parseRetro = (
     proj: Octokit.ProjectsListForRepoResponseItem
   ): IRetro => {
-    const info = parseRetroBody(proj.body)
+    const info = parseProjectDescription(proj.body)
 
     return {
       title: proj.name,
@@ -219,8 +295,14 @@ async function findLatestRetro(
   return sorted.length > 0 ? sorted[0] : undefined
 }
 
+/**
+ * Creates a new date object.
+ *
+ * @param offsetDays when set, specifies the number of days to offset from today
+ * @param atMidnight when true, the time will be set to midnight
+ */
 function newDate(offsetDays: number = 0, atMidnight: boolean = false): Date {
-  let date = new Date()
+  const date = new Date()
   date.setDate(date.getDate() + offsetDays)
 
   if (atMidnight) {
@@ -230,26 +312,38 @@ function newDate(offsetDays: number = 0, atMidnight: boolean = false): Date {
   return date
 }
 
+/**
+ * Returns the date of the next retro.
+ *
+ * @param lastRetroDate the date of the last retro, or an initial date if no previous retros scheduled
+ * @param retroDayOfWeek the day of week to schedule the retro, from 0-7 where 0 is Sunday
+ * @param retroCadenceInWeeks the frequency of retros, in weeks
+ */
 export function nextDate(
   lastRetroDate: Date,
   retroDayOfWeek: number,
   retroCadenceInWeeks: number
 ): Date {
-  let nextDate = new Date(lastRetroDate)
-  nextDate.setDate(nextDate.getDate() + retroCadenceInWeeks * 7)
+  let date = new Date(lastRetroDate)
+  date.setDate(date.getDate() + retroCadenceInWeeks * 7)
 
-  if (nextDate < new Date()) {
-    nextDate = new Date()
-    nextDate.setDate(nextDate.getDate() + (retroCadenceInWeeks - 1) * 7)
+  if (date < new Date()) {
+    date = new Date()
+    date.setDate(date.getDate() + (retroCadenceInWeeks - 1) * 7)
   }
 
   // adjust day of week if necessary
-  const daysToAdd = (7 + retroDayOfWeek - nextDate.getDay()) % 7
-  nextDate.setDate(nextDate.getDate() + daysToAdd)
+  const daysToAdd = (7 + retroDayOfWeek - date.getDay()) % 7
+  date.setDate(date.getDate() + daysToAdd)
 
-  return nextDate
+  return date
 }
 
+/**
+ * Converts the given date into a human readable string in the form DD-MM-YYYY.
+ *
+ * @param date the date
+ */
 function toReadableDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     day: '2-digit',
@@ -258,6 +352,13 @@ function toReadableDate(date: Date): string {
   })
 }
 
+/**
+ * Returns the title of the retro.
+ *
+ * @param retroTitle custom title text, or '' to use the default
+ * @param retroDate the date of the retro
+ * @param teamName the team name, or '' if no team is set
+ */
 function getFullRetroTitle(
   retroTitle: string,
   retroDate: Date,
@@ -274,6 +375,12 @@ function getFullRetroTitle(
   }
 }
 
+/**
+ * Closes the last retro board.
+ *
+ * @param client the GitHub client
+ * @param retro the retro to close
+ */
 async function closeBoard(client: github.GitHub, retro: IRetro): Promise<void> {
   await client.projects.update({
     project_id: retro.projectId,
@@ -281,19 +388,39 @@ async function closeBoard(client: github.GitHub, retro: IRetro): Promise<void> {
   })
 }
 
+/**
+ * Creates a new project board for the retro.
+ *
+ * In addition to creating the project board and setting up the columns, this also populates the
+ * board with a few standard cards including:
+ *
+ *   1. The current retro driver
+ *   2. The next retro driver
+ *   3. A link to the previous retro
+ *
+ * These cards will be added to the last column, which should be reserved for "action items" or
+ * informational use.
+ *
+ * @param client the GitHub client
+ * @param title the title of the retro
+ * @param retroInfo information used to create and schedule the new retro
+ * @param lastRetro the last retro, or undefined
+ * @param futureDriver the retro driver for the next retro, which hasn't been scheduled yet
+ * @param columnNames custom column names, or [] to use the defaults
+ */
 async function createBoard(
   client: github.GitHub,
   title: string,
   retroInfo: IRetroInfo,
   lastRetro: IRetro | undefined,
-  nextDriver: string,
+  futureDriver: string,
   columnNames: string[]
 ): Promise<string> {
   const project = await client.projects.createForRepo({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
-    name: getFullRetroTitle(title, retroInfo.date, retroInfo.team),
-    body: toRetroBody(retroInfo)
+    name: title,
+    body: toProjectDescription(retroInfo)
   })
 
   if (!project) {
@@ -311,7 +438,7 @@ async function createBoard(
 
   let lastColumnId: number | undefined = undefined
 
-  for (let name of columnNames) {
+  for (const name of columnNames) {
     const column = await client.projects.createColumn({
       project_id: project.data.id,
       name
@@ -330,7 +457,7 @@ async function createBoard(
 
     await client.projects.createCard({
       column_id: lastColumnId,
-      note: `Next retro driver: ${nextDriver}`
+      note: `Next retro driver: ${futureDriver}`
     })
 
     await client.projects.createCard({
@@ -344,6 +471,15 @@ async function createBoard(
   return project.data.html_url
 }
 
+/**
+ * Creates a tracking issue for the retro driver.
+ *
+ * @param client the GitHub client
+ * @param projectUrl the project board url
+ * @param title the title of the retro
+ * @param retroDate the date of the retro
+ * @param retroDriver the GitHub handle of the retro driver
+ */
 async function createTrackingIssue(
   client: github.GitHub,
   projectUrl: string,
@@ -356,7 +492,7 @@ async function createTrackingIssue(
   const issue = await client.issues.create({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
-    title: title,
+    title,
     body: `Hey @${retroDriver},
     
 You are scheduled to drive the next retro on ${readableDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.
@@ -376,4 +512,25 @@ Retrobot`
   })
 
   return issue.data.html_url
+}
+
+/**
+ * Sends a slack notification announcing a retro is scheduled for today.
+ *
+ * @param notificationUrl the incoming webhooks notification url
+ * @param retro information about the upcoming retro
+ */
+async function sendNotification(
+  notificationUrl: string,
+  retro: IRetro
+): Promise<void> {
+  const body = {
+    username: 'Retrobot',
+    text: `<!here|here> A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
+    icon_emoji: ':rocket:',
+    link_names: 1
+  }
+
+  const res = await axios.post(notificationUrl, body)
+  core.info(res.statusText)
 }
