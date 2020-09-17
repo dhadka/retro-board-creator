@@ -54,8 +54,8 @@ function parseRetroBody(info: string): IRetroInfo {
 async function sendNotification(notificationUrl: string, retro: IRetro) {
   let body = {
     username: 'Retrobot',
-    text: `A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
-    icon_emoji: ':pickachu-dance:',
+    text: `<!here|here> A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
+    icon_emoji: ':rocket:',
     link_names: 1
   }
 
@@ -210,6 +210,7 @@ async function findLatestRetro(
   const sorted = projects.data
     .filter(proj => proj.body.startsWith(bodyPrefix))
     .map(proj => parseRetro(proj))
+    .filter(proj => (teamName ? teamName === proj.team : !proj.team))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .reverse()
 

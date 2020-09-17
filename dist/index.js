@@ -9017,8 +9017,8 @@ function sendNotification(notificationUrl, retro) {
     return __awaiter(this, void 0, void 0, function* () {
         let body = {
             username: 'Retrobot',
-            text: `A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
-            icon_emoji: ':pickachu-dance:',
+            text: `<!here|here> A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
+            icon_emoji: ':rocket:',
             link_names: 1
         };
         let res = yield axios_1.default.post(notificationUrl, body);
@@ -9036,7 +9036,6 @@ function tryCreateRetro(args) {
         const lastRetro = yield findLatestRetro(client, args.teamName);
         if (lastRetro) {
             core.info(`Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`);
-            core.info(`Today is ${today} ${tomorrow}`);
         }
         // If there is already a scheduled retro in the future...
         if (lastRetro && lastRetro.date > today) {
@@ -9118,12 +9117,10 @@ function findLatestRetro(client, teamName) {
         const sorted = projects.data
             .filter(proj => proj.body.startsWith(bodyPrefix))
             .map(proj => parseRetro(proj))
+            .filter(proj => (teamName ? teamName === proj.team : !proj.team))
             .sort((a, b) => a.date.getTime() - b.date.getTime())
             .reverse();
         core.info(`Found ${sorted.length} retro projects for this repo`);
-        for (const s of sorted) {
-            core.info(` - ${s.date}`);
-        }
         return sorted.length > 0 ? sorted[0] : undefined;
     });
 }
