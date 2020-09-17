@@ -44,6 +44,12 @@ jobs:
 
 **`only-log`** - Log what actions would be performed, but do not actually create the retro board, issue, or notifications.  Useful for testing.
 
+## Changing retro dates
+
+Changing the date of a retro whose project board already exists is easy.  Just edit the project board and find in the description the field `"date": "..."`.  All future retros are based on this date.  The next retro will be scheduled approximately N weeks, where N is the value in the `retro-cadence-weeks` setting, from the new date.
+
+If you want to change the cadence and/or day of week for just future retros, you can modify the `retro-cadence-weeks` and `retro-day-of-week` settings.  Any existing retro will be unchanged (but you can manually change it as noted above), but all future retros will use the new schedule.
+
 ## How to contribute
 
 Install the dependencies  

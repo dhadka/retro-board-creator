@@ -9035,7 +9035,7 @@ function tryCreateRetro(args) {
         const lastRetro = yield findLatestRetro(client, args.teamName);
         // If there is already a scheduled retro in the future...
         if (lastRetro && lastRetro.date > today) {
-            core.info(`Retro scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`);
+            core.info(`Retro already scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`);
             if (lastRetro.date < tomorrow) {
                 core.info('Retro happening today, sending notification');
                 if (!args.onlyLog) {
@@ -9218,9 +9218,9 @@ function createTrackingIssue(client, projectUrl, title, retroDate, retroDriver) 
             title: title,
             body: `Hey @${retroDriver},
     
-You are scheduled to drive the next retro on ${readableDate}.
-The retro board has been created at ${projectUrl}.
-Please remind the team beforehand to fill out their cards.
+You are scheduled to drive the next retro on ${readableDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.
+
+Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
 
 Best Regards,
 
