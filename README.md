@@ -1,11 +1,13 @@
 # Retrobot
 
-Retrobot is based heavily off of [c2c-actions-runtime's retro board creator](https://github.com/hross/retro-board-creator), with the following major differences:
+Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/hross/retro-board-creator), with the following additions:
 
-1. Adds optional `team-name` input for distinguishing multiple teams using the same repo.
-2. Encodes team name, retro date, and retro driver in the project body. Reads this information to determine the next retro date and driver.
-3. Automatically adds cards pointing to the last retro and identifying the current and next retro driver.
-4. Designed to be run daily as it will also close old retro boards and send a Slack notification the day of the retro.
+1. Adds `team-name` input to distinguish multiple teams using the same repo.
+2. Stores and reads the current retro settings in the project description (encoded as JSON).
+3. As a result, the retro date and driver can be updated by modifying the JSON. This makes it easy to skip weeks, change drivers, etc.
+4. Initializes the retro board with cards showing the current driver, the next driver, and a link to the last retro.
+5. Option to send slack notifications on the day of the retro.
+6. Option to close prior retro boards.
 
 ## Example workflow
 
