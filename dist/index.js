@@ -9118,7 +9118,8 @@ function findLatestRetro(client, teamName) {
         const sorted = projects.data
             .filter(proj => proj.body.startsWith(bodyPrefix))
             .map(proj => parseRetro(proj))
-            .sort((a, b) => a.date.getTime() - b.date.getTime());
+            .sort((a, b) => a.date.getTime() - b.date.getTime())
+            .reverse();
         core.info(`Found ${sorted.length} retro projects for this repo`);
         for (const s of sorted) {
             core.info(` - ${s.date}`);
@@ -9185,7 +9186,7 @@ function createBoard(client, title, retroInfo, lastRetro, nextDriver, columnName
         if (!project) {
             return '';
         }
-        if (!columnNames) {
+        if (!columnNames.length) {
             columnNames = [
                 'Went well',
                 'Went meh',

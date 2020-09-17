@@ -77,8 +77,6 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     core.info(
       `Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`
     )
-
-    core.info(`Today is ${today} ${tomorrow}`)
   }
 
   // If there is already a scheduled retro in the future...
@@ -213,12 +211,9 @@ async function findLatestRetro(
     .filter(proj => proj.body.startsWith(bodyPrefix))
     .map(proj => parseRetro(proj))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .reverse()
 
   core.info(`Found ${sorted.length} retro projects for this repo`)
-
-  for (const s of sorted) {
-    core.info(` - ${s.date}`)
-  }
 
   return sorted.length > 0 ? sorted[0] : undefined
 }
@@ -304,7 +299,7 @@ async function createBoard(
     return ''
   }
 
-  if (!columnNames) {
+  if (!columnNames.length) {
     columnNames = [
       'Went well',
       'Went meh',
