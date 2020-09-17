@@ -44,11 +44,38 @@ jobs:
 
 **`only-log`** - Log what actions would be performed, but do not actually create the retro board, issue, or notifications.  Useful for testing.
 
-## Changing retro dates
+## Changing the schedule
 
-Changing the date of a retro whose project board already exists is easy.  Just edit the project board and find in the description the field `"date": "..."`.  All future retros are based on this date.  The next retro will be scheduled approximately N weeks, where N is the value in the `retro-cadence-weeks` setting, from the new date.
+Retrobot uses information stored in the project board description.  It is encoded as a JSON string and can be easily edited to change the upcoming retro schedule.
 
-If you want to change the cadence and/or day of week for just future retros, you can modify the `retro-cadence-weeks` and `retro-day-of-week` settings.  Any existing retro will be unchanged (but you can manually change it as noted above), but all future retros will use the new schedule.
+### Changing date
+
+Does the retro fall on a holiday?  Need to reschedule it to a different day or week?  Find and change the `date` field in the JSON.  Retrobot will automatically use the new date.  Furthermore, the subsequent retro will be scheduled approximately N weeks, where N is the `retro-cadence-weeks` value, from the new date.
+
+### Changing cadence or day of week
+
+Modify the `retro-cadence-weeks` and/or `retro-day-of-week` settings in the Action workflow.  You will need to manually changing any existing retro project boards, but all future retros will use the new schedule.
+
+### Changing retro driver
+
+The retro driver order can be changed at any time by editing the `handles` setting.  You can also add or remove handles at any time.  However, this will not change any existing retro project boards.  If you need update the driver for the existing retro, please make the following changes:
+
+1. Update the `driver` field in the JSON
+2. Edit the `handles` setting in the Actions workflow file to correct the sequence.
+
+This is necessary to keep the ordering of retro drivers consistent.  Just changing the `driver` field will disrupt the sequence.  For example, if `bob` and `erica` need to swap their dates, you would change the workflow as follows:
+
+**Before:**
+```
+handles: alice,bob,charlie,denise,erica
+```
+
+**After:**
+```
+handles: alice,erica,charlie,denise,bob
+```
+
+This ensures the retro driver sequence for all other individuals is unchanged. `erica` will be the next retro driver, followed by `charlie`, `denise`, `bob`, and `alice` before repeating.
 
 ## How to contribute
 
