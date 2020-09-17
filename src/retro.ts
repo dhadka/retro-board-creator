@@ -73,12 +73,16 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const tomorrow = newDate(1, true)
   const lastRetro = await findLatestRetro(client, args.teamName)
 
-  // If there is already a scheduled retro in the future...
-  if (lastRetro && lastRetro.date > today) {
+  if (lastRetro) {
     core.info(
-      `Retro already scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`
+      `Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`
     )
 
+    core.info(`Today is ${today} ${tomorrow}`)
+  }
+
+  // If there is already a scheduled retro in the future...
+  if (lastRetro && lastRetro.date > today) {
     if (lastRetro.date < tomorrow) {
       core.info('Retro happening today, sending notification')
 
@@ -211,6 +215,10 @@ async function findLatestRetro(
     .sort((a, b) => a.date.getTime() - b.date.getTime())
 
   core.info(`Found ${sorted.length} retro projects for this repo`)
+
+  for (const s of sorted) {
+    core.info(` - ${s.date}`)
+  }
 
   return sorted.length > 0 ? sorted[0] : undefined
 }
