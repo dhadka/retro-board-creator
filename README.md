@@ -62,24 +62,7 @@ Modify the `retro-cadence-weeks` and/or `retro-day-of-week` settings in the Acti
 
 ### Changing retro driver
 
-The retro driver order can be changed at any time by editing the `handles` setting.  You can also add or remove handles at any time.  However, this will not change any existing retro project boards.  If you need update the driver for the existing retro, please make the following changes:
-
-1. Update the `driver` field in the JSON
-2. Edit the `handles` setting in the Actions workflow file to correct the sequence.
-
-This is necessary to keep the ordering of retro drivers consistent.  Just changing the `driver` field will disrupt the sequence.  For example, if `bob` and `erica` need to swap their dates, you would change the workflow as follows:
-
-**Before:**
-```
-handles: alice,bob,charlie,denise,erica
-```
-
-**After:**
-```
-handles: alice,erica,charlie,denise,bob
-```
-
-This ensures the retro driver sequence for all other individuals is unchanged. `erica` will be the next retro driver, followed by `charlie`, `denise`, `bob`, and `alice` before repeating.
+The retro driver order can be changed at any time by editing the `handles` setting.  You can also add or remove handles at any time.  However, this will not change any existing retro project boards.  If you need update the driver for the existing retro, it is a good idea to change both the `driver` name in the JSON as well as update the `handles` in the workflow file to ensure the order of retro drives is consistent.
 
 ## How to contribute
 
