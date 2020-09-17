@@ -54,15 +54,15 @@ Retrobot uses information stored in the project board description.  It is encode
 
 ### Changing date
 
-Does the retro fall on a holiday?  Need to reschedule it to a different day or week?  Find and change the `date` field in the JSON.  Retrobot will automatically use the new date.  Furthermore, the subsequent retro will be scheduled approximately N weeks, where N is the `retro-cadence-weeks` value, from the new date.
+Does the retro fall on a holiday?  Need to reschedule one retro to a different day of the week?  Find and change the `date` field in the JSON.  Retrobot will automatically use the new date.  Furthermore, all future retros will be shifted accordingly if you skip weeks.
 
 ### Changing cadence or day of week
 
-Modify the `retro-cadence-weeks` and/or `retro-day-of-week` settings in the Action workflow.  You will need to manually changing any existing retro project boards, but all future retros will use the new schedule.
+Modify the `retro-cadence-weeks` and/or `retro-day-of-week` settings in the Action workflow.  You will need to manually change any existing retro project boards, but all future retros will use the new schedule.
 
 ### Changing retro driver
 
-The retro driver order can be changed at any time by editing the `handles` setting.  You can also add or remove handles at any time.  However, this will not change any existing retro project boards.  If you need update the driver for the existing retro, it is a good idea to change both the `driver` name in the JSON as well as update the `handles` in the workflow file to ensure the order of retro drives is consistent.
+The retro driver order can be changed at any time by editing the `handles` setting.  You can also add or remove handles at any time.  However, this will not change any existing retro project boards.  If you need update the driver for the existing retro, it is a good idea to change both the `driver` name in the JSON as well as update the `handles` in the workflow file to ensure the order of future retro drivers is unchanged.
 
 ## How to contribute
 
