@@ -6,12 +6,12 @@ inputs:
     description: 'Token for the repository. Can be passed in using `{{ secrets.GITHUB_TOKEN }}`.'
     required: true
   handles:
-    description: 'The message to post on the issue when tagging it. If none provided, will not mark issues stale.'
+    description: 'One or more GitHub user handles who will act as retro driver.'
     required: true
   team-name:
     description: 'Team name for the retro.'
   retro-cadence-weeks:
-    description: 'How often are your retros, in weeks?'
+    description: 'The frequency of retros, in weeks.'
     default: 1
   retro-day-of-week:
     description: 'The day of the week to schedule a retro on. Default is Friday.'
@@ -20,8 +20,11 @@ inputs:
     description: 'Custom title for the retro.'
   notification-url:
     description: 'Slack incoming webhooks URL to send notifications the day of the retro.'
-  close-after:
+  close-after-days:
     description: 'Close old retro boards after N days'
+  create-tracking-issue:
+    description: 'If true, creates a tracking issue and assigns to the retro driver.'
+    default: false
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
     default: false

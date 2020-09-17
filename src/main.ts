@@ -21,7 +21,8 @@ async function run(): Promise<void> {
       retroDayOfWeek: parseInt(core.getInput('retro-day-of-week')) ?? 5,
       retroTitle: core.getInput('retro-title'),
       notificationUrl: core.getInput('notification-url'),
-      closeAfter: parseInt(core.getInput('close-after')) ?? 0,
+      closeAfterDays: parseInt(core.getInput('close-after-days')) ?? 0,
+      createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
       onlyLog: core.getInput('only-log') === 'true'
     }
 

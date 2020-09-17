@@ -4328,7 +4328,8 @@ function run() {
                 retroDayOfWeek: (_b = parseInt(core.getInput('retro-day-of-week')), (_b !== null && _b !== void 0 ? _b : 5)),
                 retroTitle: core.getInput('retro-title'),
                 notificationUrl: core.getInput('notification-url'),
-                closeAfter: (_c = parseInt(core.getInput('close-after')), (_c !== null && _c !== void 0 ? _c : 0)),
+                closeAfterDays: (_c = parseInt(core.getInput('close-after-days')), (_c !== null && _c !== void 0 ? _c : 0)),
+                createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
                 onlyLog: core.getInput('only-log') === 'true'
             };
             core.info('Arguments parsed. Starting creation.');
@@ -8994,13 +8995,8 @@ const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const axios_1 = __importDefault(__webpack_require__(53));
 const bodyPrefix = 'Retrobot: ';
-function toRetroBody(team, date, driver) {
-    return (bodyPrefix +
-        JSON.stringify({
-            team: team,
-            date: date,
-            driver: driver
-        }));
+function toRetroBody(info) {
+    return bodyPrefix + JSON.stringify(info);
 }
 function parseRetroBody(info) {
     if (info.startsWith(bodyPrefix)) {
@@ -9008,7 +9004,8 @@ function parseRetroBody(info) {
         return {
             team: content['team'],
             date: new Date(content['date']),
-            driver: content['driver']
+            driver: content['driver'],
+            offset: parseInt(content['offset'])
         };
     }
     else {
@@ -9029,6 +9026,9 @@ function sendNotification(notificationUrl, retro) {
 }
 function tryCreateRetro(args) {
     return __awaiter(this, void 0, void 0, function* () {
+        if (!args.handles.length) {
+            throw Error("requires at least one handle");
+        }
         const client = new github.GitHub(args.repoToken);
         const today = newDate(0, true);
         const tomorrow = newDate(1, true);
@@ -9039,7 +9039,7 @@ function tryCreateRetro(args) {
             if (lastRetro.date < tomorrow) {
                 core.info('Retro happening today, sending notification');
                 if (!args.onlyLog) {
-                    sendNotification(args.notificationUrl, lastRetro);
+                    yield sendNotification(args.notificationUrl, lastRetro);
                 }
             }
             return;
@@ -9047,21 +9047,29 @@ function tryCreateRetro(args) {
         // Otherwise, the scheduled retro is in the past or no retro found...
         const lastRetroDate = lastRetro ? lastRetro.date : new Date();
         const lastRetroDriver = lastRetro ? lastRetro.driver : '';
+        const lastRetroOffset = lastRetro ? lastRetro.offset : 0;
         const nextRetroDate = nextDate(lastRetroDate, args.retroDayOfWeek, args.retroCadenceInWeeks);
-        const nextRetroDriver = nextDriver(args.handles, lastRetroDriver);
+        const nextRetroDriver = nextDriver(args.handles, lastRetroDriver, lastRetroOffset);
         const futureRetroDriver = nextDriver(args.handles, nextRetroDriver);
         core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`);
         if (!args.onlyLog) {
             if (lastRetro &&
-                args.closeAfter > 0 &&
-                lastRetro.date < newDate(-args.closeAfter)) {
+                args.closeAfterDays > 0 &&
+                lastRetro.date < newDate(-args.closeAfterDays)) {
                 yield closeBoard(client, lastRetro);
                 core.info(`Closed previous retro from ${lastRetro.date}`);
             }
-            const projectUrl = yield createBoard(client, args.retroTitle, nextRetroDate, args.teamName, nextRetroDriver, lastRetro, futureRetroDriver);
+            const projectUrl = yield createBoard(client, args.retroTitle, {
+                date: nextRetroDate,
+                team: args.teamName,
+                driver: nextRetroDriver,
+                offset: args.handles.indexOf(nextRetroDriver)
+            }, lastRetro, futureRetroDriver);
             core.info(`Created retro board at ${projectUrl}`);
-            const issueUrl = yield createTrackingIssue(client, projectUrl, getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName), nextRetroDate, nextRetroDriver);
-            core.info(`Created tracking issue at ${issueUrl}`);
+            if (args.createTrackingIssue) {
+                const issueUrl = yield createTrackingIssue(client, projectUrl, getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName), nextRetroDate, nextRetroDriver);
+                core.info(`Created tracking issue at ${issueUrl}`);
+            }
         }
         else {
             core.info(`Skipping project/issue creation because we are running in log mode only.`);
@@ -9069,15 +9077,20 @@ function tryCreateRetro(args) {
     });
 }
 exports.tryCreateRetro = tryCreateRetro;
-function nextDriver(handles, lastDriver) {
+function nextDriver(handles, lastDriver, lastOffset = 0) {
     if (lastDriver) {
-        const pos = handles.indexOf(lastDriver);
+        let pos = handles.indexOf(lastDriver);
+        // If the handle is not found, use the last offset to ensure fairness.
+        if (pos < 0) {
+            pos = lastOffset - 1;
+        }
         return handles[(pos + 1) % handles.length];
     }
     else {
         return handles[0];
     }
 }
+exports.nextDriver = nextDriver;
 function findLatestRetro(client, teamName) {
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Locating the last retro...');
@@ -9094,7 +9107,8 @@ function findLatestRetro(client, teamName) {
                 projectId: proj.id,
                 date: info.date,
                 team: info.team,
-                driver: info.driver
+                driver: info.driver,
+                offset: info.offset
             };
         };
         const sorted = projects.data
@@ -9125,6 +9139,7 @@ function nextDate(lastRetroDate, retroDayOfWeek, retroCadenceInWeeks) {
     nextDate.setDate(nextDate.getDate() + daysToAdd);
     return nextDate;
 }
+exports.nextDate = nextDate;
 function toReadableDate(date) {
     return date.toLocaleDateString('en-US', {
         day: '2-digit',
@@ -9152,13 +9167,13 @@ function closeBoard(client, retro) {
         });
     });
 }
-function createBoard(client, title, date, team, currentDriver, lastRetro, nextDriver) {
+function createBoard(client, title, retroInfo, lastRetro, nextDriver) {
     return __awaiter(this, void 0, void 0, function* () {
         const project = yield client.projects.createForRepo({
             owner: github.context.repo.owner,
             repo: github.context.repo.repo,
-            name: getFullRetroTitle(title, date, team),
-            body: toRetroBody(team, date, currentDriver)
+            name: getFullRetroTitle(title, retroInfo.date, retroInfo.team),
+            body: toRetroBody(retroInfo)
         });
         if (!project) {
             return '';
@@ -9177,20 +9192,20 @@ function createBoard(client, title, date, team, currentDriver, lastRetro, nextDr
             });
             columnMap[name] = column.data.id;
         }
-        yield client.projects.createCard({
-            column_id: columnMap['Action items!'],
-            note: `Today's retro driver: ${currentDriver}`
-        });
-        yield client.projects.createCard({
-            column_id: columnMap['Action items!'],
-            note: `Next retro driver: ${nextDriver}`
-        });
         if (lastRetro) {
             yield client.projects.createCard({
                 column_id: columnMap['Action items!'],
                 note: `Last retro: ${lastRetro.url}`
             });
         }
+        yield client.projects.createCard({
+            column_id: columnMap['Action items!'],
+            note: `Next retro driver: ${nextDriver}`
+        });
+        yield client.projects.createCard({
+            column_id: columnMap['Action items!'],
+            note: `Today's retro driver: ${retroInfo.driver}`
+        });
         return project.data.html_url;
     });
 }
@@ -9203,7 +9218,7 @@ function createTrackingIssue(client, projectUrl, title, retroDate, retroDriver) 
             title: title,
             body: `Hey @${retroDriver},
     
-You are scheduled to drive the next retro on ${retroDate}.
+You are scheduled to drive the next retro on ${readableDate}.
 The retro board has been created at ${projectUrl}.
 Please remind the team beforehand to fill out their cards.
 
