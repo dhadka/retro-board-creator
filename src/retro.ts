@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { Octokit } from '@octokit/rest'
-import { default as axios } from 'axios'
+import {Octokit} from '@octokit/rest'
+import {default as axios} from 'axios'
 
 export interface IRetroArguments {
   repoToken: string
@@ -11,28 +11,33 @@ export interface IRetroArguments {
   retroDayOfWeek: number
   retroTitle: string
   notificationUrl: string
+  closeAfter: number
   onlyLog: boolean
 }
 
 type IRetro = IRetroInfo & {
-  title: string,
+  title: string
   url: string
+  projectId: number
 }
 
 interface IRetroInfo {
-  team: string,
-  date: Date,
+  team: string
+  date: Date
   driver: string
 }
 
-const bodyPrefix = "Retrobot: "
+const bodyPrefix = 'Retrobot: '
 
 function toRetroBody(team: string, date: Date, driver: string): string {
-  return bodyPrefix + JSON.stringify({
-    team: team,
-    date: date,
-    driver: driver
-  })
+  return (
+    bodyPrefix +
+    JSON.stringify({
+      team: team,
+      date: date,
+      driver: driver
+    })
+  )
 }
 
 function parseRetroBody(info: string): IRetroInfo {
@@ -51,10 +56,10 @@ function parseRetroBody(info: string): IRetroInfo {
 
 async function sendNotification(notificationUrl: string, retro: IRetro) {
   let body = {
-    'username': 'Upcoming Retro',
-    'text': `Visit ${retro.url} to add your cards.`,
-    'icon_emoji': ':pickachu-dance:',
-    'link_names':  1
+    username: 'Upcoming Retro',
+    text: `A retro is scheduled for today! Visit ${retro.url} to add your cards. @${retro.driver} will be driving today's retro.`,
+    icon_emoji: ':pickachu-dance:',
+    link_names: 1
   }
 
   let res = await axios.post(notificationUrl, body)
@@ -64,32 +69,29 @@ async function sendNotification(notificationUrl: string, retro: IRetro) {
 export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const client = new github.GitHub(args.repoToken)
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = newDate(0, true)
+  const tomorrow = newDate(1, true)
 
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate()+1)
-
-  core.info('Looking for latest retro date...')
-
-  // find the last retro
   const lastRetro = await findLatestRetro(client, args.teamName)
 
-  // If there is a retro and it's in the future, handle it.
-  if (lastRetro) {
-    if (lastRetro.date > today && lastRetro.date < tomorrow) {
-      core.info("Retro happening today, sending notification")
+  // If there is already a scheduled retro in the future...
+  if (lastRetro && lastRetro.date > today) {
+    core.info(
+      `Retro scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`
+    )
+
+    if (lastRetro.date < tomorrow) {
+      core.info('Retro happening today, sending notification')
+
       if (!args.onlyLog) {
         sendNotification(args.notificationUrl, lastRetro)
       }
-      return
-    } else if (lastRetro.date > today) {
-      core.info("Retro hasn't happened yet, skip creating a new one")
-      return
     }
+
+    return
   }
 
-  // Otherwise, there is a retro in the past or no retro at all. Create a new one.
+  // Otherwise, the scheduled retro is in the past or no retro found...
   const lastRetroDate = lastRetro ? lastRetro.date : new Date()
   const lastRetroDriver = lastRetro ? lastRetro.driver : ''
 
@@ -102,9 +104,16 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const nextRetroDriver = nextDriver(args.handles, lastRetroDriver)
   const futureRetroDriver = nextDriver(args.handles, nextRetroDriver)
 
-  core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`)
+  core.info(
+    `Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`
+  )
 
   if (!args.onlyLog) {
+    if (lastRetro && args.closeAfter > 0 && lastRetro.date < newDate(-args.closeAfter)) {
+      await closeBoard(client, lastRetro)
+      core.info(`Closed previous retro from ${lastRetro.date}`)
+    }
+
     const projectUrl = await createBoard(
       client,
       args.retroTitle,
@@ -115,7 +124,17 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
       futureRetroDriver
     )
 
-    //await createTrackingIssue(client, projectUrl, nextRetroDriver)
+    core.info(`Created retro board at ${projectUrl}`)
+
+    const issueUrl = await createTrackingIssue(
+      client,
+      projectUrl,
+      getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
+      nextRetroDate,
+      nextRetroDriver
+    )
+
+    core.info(`Created tracking issue at ${issueUrl}`)
   } else {
     core.info(
       `Skipping project/issue creation because we are running in log mode only.`
@@ -132,29 +151,33 @@ function nextDriver(handles: string[], lastDriver: string): string {
   }
 }
 
-// look at all of the repo projects and give back the last retro
 async function findLatestRetro(
   client: github.GitHub,
   teamName: string
 ): Promise<IRetro | undefined> {
+  core.info('Locating the last retro...')
+
   const projects = await client.projects.listForRepo({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo
   })
 
-  const parseRetro = (proj: Octokit.ProjectsListForRepoResponseItem): IRetro => {
+  core.info(`Found ${projects.data.length} projects in this repo`)
+
+  const parseRetro = (
+    proj: Octokit.ProjectsListForRepoResponseItem
+  ): IRetro => {
     const info = parseRetroBody(proj.body)
 
     return {
       title: proj.name,
       url: proj.html_url,
+      projectId: proj.id,
       date: info.date,
       team: info.team,
       driver: info.driver
     }
   }
-
-  core.info(`Found ${projects.data.length} for this repo`)
 
   const sorted = projects.data
     .filter(proj => proj.body.startsWith(bodyPrefix))
@@ -164,6 +187,17 @@ async function findLatestRetro(
   core.info(`Found ${sorted.length} retro projects for this repo`)
 
   return sorted.length > 0 ? sorted[0] : undefined
+}
+
+function newDate(offsetDays: number = 0, atMidnight: boolean = false): Date {
+  let date = new Date()
+  date.setDate(date.getDate() + offsetDays)
+
+  if (atMidnight) {
+    date.setHours(0, 0, 0, 0)
+  }
+
+  return date
 }
 
 function nextDate(
@@ -186,16 +220,20 @@ function nextDate(
   return nextDate
 }
 
+function toReadableDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
 function getFullRetroTitle(
   retroTitle: string,
   retroDate: Date,
   teamName: string
 ): string {
-  const readableDate = retroDate.toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  const readableDate = toReadableDate(retroDate)
 
   if (retroTitle) {
     return `${retroTitle}${readableDate}`
@@ -206,7 +244,16 @@ function getFullRetroTitle(
   }
 }
 
-// create the retro board and return the URL
+async function closeBoard(
+  client: github.GitHub,
+  retro: IRetro
+): Promise<void> {
+  await client.projects.update({
+    project_id: retro.projectId,
+    state: "closed"
+  })
+}
+
 async function createBoard(
   client: github.GitHub,
   title: string,
@@ -227,8 +274,13 @@ async function createBoard(
     return ''
   }
 
-  const columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!']
-  const columnMap: { [name: string]: number } = {}
+  const columnNames = [
+    'Went well',
+    'Went meh',
+    'Could have gone better',
+    'Action items!'
+  ]
+  const columnMap: {[name: string]: number} = {}
 
   for (const name of columnNames) {
     const column = await client.projects.createColumn({
@@ -239,6 +291,16 @@ async function createBoard(
     columnMap[name] = column.data.id
   }
 
+  await client.projects.createCard({
+    column_id: columnMap['Action items!'],
+    note: `Today's retro driver: ${currentDriver}`
+  })
+
+  await client.projects.createCard({
+    column_id: columnMap['Action items!'],
+    note: `Next retro driver: ${nextDriver}`
+  })
+
   if (lastRetro) {
     await client.projects.createCard({
       column_id: columnMap['Action items!'],
@@ -246,33 +308,31 @@ async function createBoard(
     })
   }
 
-  await client.projects.createCard({
-    column_id: columnMap['Action items!'],
-    note: `Next retro driver: ${nextDriver}`
-  })
-
   return project.data.html_url
 }
 
-// // create a tracking issue for the retro
-// async function createTrackingIssue(
-//   client: github.GitHub,
-//   projectUrl: string,
-//   retroDriver: string
-// ): Promise<number> {
-//   const issue = await client.issues.create({
-//     owner: github.context.repo.owner,
-//     repo: github.context.repo.repo,
-//     title: `The next retro driver is @${retroDriver}`,
-//     body: `Hey @${retroDriver} please remind everyone to fill out the retrospective board at ${projectUrl}`
-//   })
+async function createTrackingIssue(
+  client: github.GitHub,
+  projectUrl: string,
+  title: string,
+  retroDate: Date,
+  retroDriver: string
+): Promise<string> {
+  const readableDate = toReadableDate(retroDate)
 
-//   await client.issues.addAssignees({
-//     owner: github.context.repo.owner,
-//     repo: github.context.repo.repo,
-//     issue_number: issue.data.number,
-//     assignees: [retroDriver]
-//   })
+  const issue = await client.issues.create({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    title: title,
+    body: `Hey @${retroDriver},\n\nYou are scheduled to drive the next retro on ${retroDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.\n\nBest Regards,\nRetrobot`
+  })
 
-//   return issue.data.number
-// }
+  await client.issues.addAssignees({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    issue_number: issue.data.number,
+    assignees: [retroDriver]
+  })
+
+  return issue.data.html_url
+}

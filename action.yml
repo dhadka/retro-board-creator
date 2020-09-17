@@ -20,6 +20,8 @@ inputs:
     description: 'Custom title for the retro.'
   notification-url:
     description: 'Slack incoming webhooks URL to send notifications the day of the retro.'
+  close-after:
+    description: 'Close old retro boards after N days'
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
     default: false
