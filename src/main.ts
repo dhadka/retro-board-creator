@@ -24,6 +24,7 @@ async function run(): Promise<void> {
       closeAfterDays: parseInt(core.getInput('close-after-days')) ?? 0,
       createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
       columns: parseCommaSeparatedString(core.getInput('columns')),
+      cards: core.getInput('cards'),
       onlyLog: core.getInput('only-log') === 'true'
     }
 

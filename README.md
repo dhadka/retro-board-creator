@@ -26,6 +26,11 @@ jobs:
       with: 
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         handles: alice,bob,charlie,denise,erica
+        columns: Went well, Went meh, Could have been better, Action items!
+        cards: |
+          "Retro created by retrobot" => Went well
+          "Current retro driver: {{ current_driver }} => Action items!
+          
 ```
 
 ## Custom options

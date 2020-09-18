@@ -2,6 +2,7 @@ import * as core from '@actions/core'
 import * as github from '@actions/github'
 import {Octokit} from '@octokit/rest'
 import {default as axios} from 'axios'
+import * as mustache from 'mustache'
 
 export interface IRetroArguments {
   repoToken: string
@@ -14,6 +15,7 @@ export interface IRetroArguments {
   closeAfterDays: number
   createTrackingIssue: boolean
   columns: string[]
+  cards: string
   onlyLog: boolean
 }
 
@@ -64,6 +66,8 @@ type IRetro = IRetroInfo & {
   projectId: number
 }
 
+type KeyToIdMap = {[key: string]: number}
+
 /**
  * Performs all the functionality to create the retros, including:
  *
@@ -89,6 +93,10 @@ type IRetro = IRetroInfo & {
 export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   if (!args.handles.length) {
     throw Error('requires at least one handle')
+  }
+
+  if (args.onlyLog) {
+    core.info('Running in debug mode, will only log messages')
   }
 
   const client = new github.GitHub(args.repoToken)
@@ -138,47 +146,45 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     `Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`
   )
 
-  if (!args.onlyLog) {
-    if (
-      lastRetro &&
-      args.closeAfterDays > 0 &&
-      lastRetro.date < newDate(-args.closeAfterDays)
-    ) {
-      await closeBoard(client, lastRetro)
-      core.info(`Closed previous retro from ${lastRetro.date}`)
-    }
+  // Close the previous retro
+  if (
+    lastRetro &&
+    args.closeAfterDays > 0 &&
+    lastRetro.date < newDate(-args.closeAfterDays)
+  ) {
+    await closeBoard(client, lastRetro)
+    core.info(`Closed previous retro from ${lastRetro.date}`)
+  }
 
-    const projectUrl = await createBoard(
+  const projectUrl = await createBoard(
+    client,
+    getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
+    {
+      date: nextRetroDate,
+      team: args.teamName,
+      driver: nextRetroDriver,
+      offset: args.handles.indexOf(nextRetroDriver)
+    },
+    lastRetro,
+    futureRetroDriver,
+    args.columns,
+    args.cards,
+    args.onlyLog
+  )
+
+  core.info(`Created retro board at ${projectUrl}`)
+
+  if (args.createTrackingIssue) {
+    const issueUrl = await createTrackingIssue(
       client,
+      projectUrl,
       getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
-      {
-        date: nextRetroDate,
-        team: args.teamName,
-        driver: nextRetroDriver,
-        offset: args.handles.indexOf(nextRetroDriver)
-      },
-      lastRetro,
-      futureRetroDriver,
-      args.columns
+      nextRetroDate,
+      nextRetroDriver,
+      args.onlyLog
     )
 
-    core.info(`Created retro board at ${projectUrl}`)
-
-    if (args.createTrackingIssue) {
-      const issueUrl = await createTrackingIssue(
-        client,
-        projectUrl,
-        getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
-        nextRetroDate,
-        nextRetroDriver
-      )
-
-      core.info(`Created tracking issue at ${issueUrl}`)
-    }
-  } else {
-    core.info(
-      `Skipping project/issue creation because we are running in log mode only.`
-    )
+    core.info(`Created tracking issue at ${issueUrl}`)
   }
 }
 
@@ -414,17 +420,27 @@ async function createBoard(
   retroInfo: IRetroInfo,
   lastRetro: IRetro | undefined,
   futureDriver: string,
-  columnNames: string[]
+  columnNames: string[],
+  cards: string,
+  logOnly: boolean
 ): Promise<string> {
-  const project = await client.projects.createForRepo({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    name: title,
-    body: toProjectDescription(retroInfo)
-  })
+  let projectId = 0
+  let projectUrl = ''
 
-  if (!project) {
-    return ''
+  if (!logOnly) {
+    const project = await client.projects.createForRepo({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      name: title,
+      body: toProjectDescription(retroInfo)
+    })
+
+    if (!project) {
+      return ''
+    }
+
+    projectId = project.data.id
+    projectUrl = project.data.html_url
   }
 
   if (!columnNames.length) {
@@ -436,39 +452,134 @@ async function createBoard(
     ]
   }
 
-  let lastColumnId: number | undefined = undefined
+  const columnMap = await populateColumns(
+    client,
+    projectId,
+    columnNames,
+    logOnly
+  )
+
+  if (!cards && columnNames.length > 0) {
+    // TODO: For backwards compat, create default cards
+    const lastColumnName = columnNames[columnNames.length-1]
+
+    cards = `{{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => ${lastColumnName}
+Next retro driver: {{ next-driver }} => ${lastColumnName}
+Today's retro driver: {{ driver }} => ${lastColumnName}`
+  }
+
+  if (cards) {
+    const view = createView(title, retroInfo, lastRetro, futureDriver)
+    await populateCards(client, cards, view, columnMap, logOnly)
+  }
+
+  return projectUrl
+}
+
+interface ILastRetroView {
+  title: string
+  date: string
+  driver: string
+  url: string
+}
+
+interface IRetroView {
+  title: string
+  date: string
+  driver: string
+  team: string
+  'next-driver': string
+  'last-retro': ILastRetroView | undefined
+}
+
+function createView(
+  title: string,
+  retroInfo: IRetroInfo,
+  lastRetro: IRetro | undefined,
+  futureDriver: string
+): IRetroView {
+  const view: IRetroView = {
+    title,
+    date: toReadableDate(retroInfo.date),
+    driver: retroInfo.driver,
+    team: retroInfo.team,
+    'next-driver': futureDriver,
+    'last-retro': undefined
+  }
+
+  if (lastRetro) {
+    view['last-retro'] = {
+      title: lastRetro.title,
+      date: toReadableDate(lastRetro.date),
+      driver: lastRetro.driver,
+      url: lastRetro.url
+    }
+  }
+
+  return view
+}
+
+async function populateColumns(
+  client: github.GitHub,
+  projectId: number,
+  columnNames: string[],
+  logOnly: boolean
+): Promise<KeyToIdMap> {
+  const columnMap: KeyToIdMap = {}
 
   for (const name of columnNames) {
-    const column = await client.projects.createColumn({
-      project_id: project.data.id,
-      name
-    })
+    core.info(`Creating column '${name}'`)
 
-    lastColumnId = column.data.id
-  }
-
-  if (lastColumnId) {
-    if (lastRetro) {
-      await client.projects.createCard({
-        column_id: lastColumnId,
-        note: `Last retro: ${lastRetro.url}`
+    if (!logOnly) {
+      const column = await client.projects.createColumn({
+        project_id: projectId,
+        name
       })
+
+      columnMap[name] = column.data.id
     }
-
-    await client.projects.createCard({
-      column_id: lastColumnId,
-      note: `Next retro driver: ${futureDriver}`
-    })
-
-    await client.projects.createCard({
-      column_id: lastColumnId,
-      note: `Today's retro driver: ${retroInfo.driver}`
-    })
-  } else {
-    core.info('No columns created so no cards added')
   }
 
-  return project.data.html_url
+  return columnMap
+}
+
+async function populateCards(
+  client: github.GitHub,
+  cards: string,
+  view: IRetroView,
+  columnMap: KeyToIdMap,
+  logOnly: boolean
+): Promise<void> {
+  if (!cards) {
+    core.info('No cards to render')
+    return
+  }
+
+  for (const card of cards.split('\n').map(c => c.trim())) {
+    const parts = card.split('=>').map(p => p.trim())
+
+    const text = mustache.render(parts[0], view)
+    const column = parts[1]
+
+    if (text) {
+      core.info(`Adding card '${text}' to column '${column}'`)
+
+      if (!logOnly) {
+        const columnId = columnMap[column]
+
+        if (columnId) {
+          await client.projects.createCard({
+            column_id: columnId,
+            note: text
+          })
+        } else {
+          core.info(`Card not rendered, no matching column: ${column}`)
+        }
+      }
+    } else {
+      core.info(`Card not rendered, text is empty: ${parts[0]}`)
+    }
+  }
 }
 
 /**
@@ -485,33 +596,39 @@ async function createTrackingIssue(
   projectUrl: string,
   title: string,
   retroDate: Date,
-  retroDriver: string
+  retroDriver: string,
+  logOnly: boolean
 ): Promise<string> {
   const readableDate = toReadableDate(retroDate)
+  let issueUrl = ''
 
-  const issue = await client.issues.create({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    title,
-    body: `Hey @${retroDriver},
-    
-You are scheduled to drive the next retro on ${readableDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.
+  if (!logOnly) {
+    const issue = await client.issues.create({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      title,
+      body: `Hey @${retroDriver},
+      
+  You are scheduled to drive the next retro on ${readableDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.
 
-Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
+  Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
 
-Best Regards,
+  Best Regards,
 
-Retrobot`
-  })
+  Retrobot`
+    })
 
-  await client.issues.addAssignees({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    issue_number: issue.data.number,
-    assignees: [retroDriver]
-  })
+    await client.issues.addAssignees({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: issue.data.number,
+      assignees: [retroDriver]
+    })
 
-  return issue.data.html_url
+    issueUrl = issue.data.html_url
+  }
+
+  return issueUrl
 }
 
 /**

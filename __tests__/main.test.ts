@@ -1,4 +1,9 @@
-import {nextDate, nextDriver} from '../src/retro'
+import {
+  nextDate,
+  nextDriver,
+  IRetroArguments,
+  tryCreateRetro
+} from '../src/retro'
 
 test('test nextDate', async () => {
   expect(nextDate(new Date('2020-09-13T12:00:00.000Z'), 3, 2)).toStrictEqual(
