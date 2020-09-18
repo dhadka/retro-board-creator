@@ -154,7 +154,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   core.info(`Created retro board at ${projectUrl}`)
 
   if (args.createTrackingIssue) {
-    const issueUrl = await createTrackingIssue(client, newRetro.driver, title, args.issueTemplate, view, args.onlyLog)
+    const issueUrl = await createTrackingIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog)
 
     core.info(`Created tracking issue at ${issueUrl}`)
   }
@@ -540,7 +540,7 @@ async function populateCards(
 async function createTrackingIssue(
   client: github.GitHub,
   title: string,
-  assignee: string,
+  retro: IRetroInfo,
   template: string,
   view: any,
   onlyLog: boolean
@@ -559,7 +559,7 @@ async function createTrackingIssue(
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       issue_number: issue.data.number,
-      assignees: [assignee]
+      assignees: [retro.driver]
     })
 
     issueUrl = issue.data.html_url

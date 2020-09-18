@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import {IRetroArguments, tryCreateRetro} from './retro'
 
-const defaultTitleTemplate = '{{ team }} Retro on {{ date }}'
+const defaultTitleTemplate = '{{ team }} Retro on {{{ date }}}'
 
 const defaultIssueTemplate = `Hey {{ driver }},
       
@@ -14,7 +14,7 @@ Best Regards,
 Retrobot`
 
 const defaultNotificationTemplate =
-  '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
+  '<!here|here> A retro is scheduled for today! Visit <{{ url }}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
 
 function parseCSV(s: string): string[] {
   if (!s) return []
