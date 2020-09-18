@@ -76,6 +76,7 @@ Retrobot uses Mustache to render templates.  Reference any variable below with `
 * `driver` - The GitHub handle of the retro driver
 * `team` - The team name (if set)
 * `next-driver` - The GitHub handle of the following retro driver
+* `url` - The url to the current retro board (only available for issue creation and notifications)
 
 In addition, if a previous retro is found, the `last-retro` variable will be set which contains
 
@@ -84,7 +85,9 @@ In addition, if a previous retro is found, the `last-retro` variable will be set
 * `driver` - The GitHub handle of the previous retro driver
 * `url` - The url to the previous retro's project board
 
-You can reference these variables using `{{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }}`.  If `last-retro` does not exist, the entire contents of the string will not be rendered.  Also note the use of three brackets `{{{ ... }}}` for the url.  This prevents escaping the contents of the URL.
+You can reference these variables using `{{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }}`.  If `last-retro` does not exist, the entire contents of the string will not be rendered.
+
+**Note: Mustache automatically escapes strings for HTML. Disable escaping by using three brackets `{{{ ... }}}`.  This is good for urls and dates.**
 
 ## Changing the schedule
 

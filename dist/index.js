@@ -9819,6 +9819,7 @@ function tryCreateRetro(args) {
         const view = createView(newRetro, lastRetro, futureRetroDriver);
         const title = createTitle(args.titleTemplate, view);
         const projectUrl = yield createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog);
+        view['url'] = projectUrl;
         core.info(`Created retro board at ${projectUrl}`);
         if (args.createTrackingIssue) {
             const issueUrl = yield createTrackingIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog);
@@ -9830,6 +9831,7 @@ function tryCreateRetro(args) {
             args.closeAfterDays > 0 &&
             lastRetro.date < newDate(-args.closeAfterDays)) {
             yield closeBoard(client, lastRetro, args.onlyLog);
+            core.info(`Closed old project board from ${lastRetro.date}`);
         }
     });
 }

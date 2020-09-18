@@ -5,7 +5,7 @@ const defaultTitleTemplate = '{{ team }} Retro on {{{ date }}}'
 
 const defaultIssueTemplate = `Hey {{ driver }},
       
-You are scheduled to drive the next retro on {{ date }}. The retro board has been created at {{ url }}. Please remind the team beforehand to fill out their cards.
+You are scheduled to drive the next retro on {{ date }}. The retro board has been created at {{{ url }}}. Please remind the team beforehand to fill out their cards.
 
 Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
 
@@ -14,7 +14,7 @@ Best Regards,
 Retrobot`
 
 const defaultNotificationTemplate =
-  '<!here|here> A retro is scheduled for today! Visit <{{ url }}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
+  '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
 
 function parseCSV(s: string): string[] {
   if (!s) return []

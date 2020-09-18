@@ -131,9 +131,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const lastRetroOffset = lastRetro ? lastRetro.offset : 0
 
   const nextRetroDate = nextDate(lastRetroDate, args.retroDayOfWeek, args.retroCadenceInWeeks)
-
   const nextRetroDriver = nextDriver(args.handles, lastRetroDriver, lastRetroOffset)
-
   const futureRetroDriver = nextDriver(args.handles, nextRetroDriver)
 
   core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`)
@@ -150,12 +148,12 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const title = createTitle(args.titleTemplate, view)
 
   const projectUrl = await createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog)
+  view['url'] = projectUrl
 
   core.info(`Created retro board at ${projectUrl}`)
 
   if (args.createTrackingIssue) {
     const issueUrl = await createTrackingIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog)
-
     core.info(`Created tracking issue at ${issueUrl}`)
   }
 
@@ -167,6 +165,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     lastRetro.date < newDate(-args.closeAfterDays)
   ) {
     await closeBoard(client, lastRetro, args.onlyLog)
+    core.info(`Closed old project board from ${lastRetro.date}`)
   }
 }
 
