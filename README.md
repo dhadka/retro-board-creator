@@ -4,11 +4,12 @@ Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/
 
 1. Adds `team-name` input to distinguish multiple teams using the same repo.
 2. Stores and reads the current retro settings in the project description (encoded as JSON).
-3. As a result, the retro date and driver can be updated by modifying the JSON. This makes it easy to skip weeks, change drivers, etc.
-4. Initializes the retro board with cards showing the current driver, the next driver, and a link to the last retro.
-5. Option to send slack notifications on the day of the retro.
-6. Option to close prior retro boards.
-7. Option to customize the retro board columns.
+3. Option to populate board with custom cards.
+4. Option to send slack notifications on the day of the retro.
+5. Option to close prior retro boards.
+6. Option to customize the retro board columns.
+7. Everything is customizable via mustache templates with `{{ variable }}` rendering
+
 
 ## Example workflow
 

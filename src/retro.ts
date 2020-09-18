@@ -112,21 +112,14 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const lastRetro = await findLatestRetro(client, args.teamName)
 
   if (lastRetro) {
-    core.info(
-      `Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`
-    )
+    core.info(`Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`)
   }
 
   // If there is already a scheduled retro in the future.
   if (lastRetro && lastRetro.date > today) {
     if (lastRetro.date < tomorrow) {
       core.info('Retro happening today, sending notification')
-      await sendNotification(
-        args.notificationUrl,
-        args.notificationTemplate,
-        lastRetro,
-        args.onlyLog
-      )
+      await sendNotification(args.notificationUrl, args.notificationTemplate, lastRetro, args.onlyLog)
     }
 
     return
@@ -137,23 +130,13 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const lastRetroDriver = lastRetro ? lastRetro.driver : ''
   const lastRetroOffset = lastRetro ? lastRetro.offset : 0
 
-  const nextRetroDate = nextDate(
-    lastRetroDate,
-    args.retroDayOfWeek,
-    args.retroCadenceInWeeks
-  )
+  const nextRetroDate = nextDate(lastRetroDate, args.retroDayOfWeek, args.retroCadenceInWeeks)
 
-  const nextRetroDriver = nextDriver(
-    args.handles,
-    lastRetroDriver,
-    lastRetroOffset
-  )
+  const nextRetroDriver = nextDriver(args.handles, lastRetroDriver, lastRetroOffset)
 
   const futureRetroDriver = nextDriver(args.handles, nextRetroDriver)
 
-  core.info(
-    `Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`
-  )
+  core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`)
 
   // Create the new retro and issue.
   const newRetro: IRetroInfo = {
@@ -166,27 +149,12 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   const view = createView(newRetro, lastRetro, futureRetroDriver)
   const title = createTitle(args.titleTemplate, view)
 
-  const projectUrl = await createBoard(
-    client,
-    title,
-    newRetro,
-    args.columns,
-    args.cards,
-    view,
-    args.onlyLog
-  )
+  const projectUrl = await createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog)
 
   core.info(`Created retro board at ${projectUrl}`)
 
   if (args.createTrackingIssue) {
-    const issueUrl = await createTrackingIssue(
-      client,
-      newRetro.driver,
-      title,
-      args.issueTemplate,
-      view,
-      args.onlyLog
-    )
+    const issueUrl = await createTrackingIssue(client, newRetro.driver, title, args.issueTemplate, view, args.onlyLog)
 
     core.info(`Created tracking issue at ${issueUrl}`)
   }
@@ -210,11 +178,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
  * @param lastDriver the GitHub handle of the last retro driver, or '' if no previous retros found
  * @param lastOffset the offset of the last retro driver
  */
-export function nextDriver(
-  handles: string[],
-  lastDriver: string,
-  lastOffset: number = 0
-): string {
+export function nextDriver(handles: string[], lastDriver: string, lastOffset: number = 0): string {
   if (lastDriver) {
     let pos = handles.indexOf(lastDriver)
 
@@ -274,10 +238,7 @@ function parseProjectDescription(info: string): IRetroInfo {
  * @param teamName the team name, or '' if not defined
  * @returns information about the last retro, or undefined if no matching retro found
  */
-async function findLatestRetro(
-  client: github.GitHub,
-  teamName: string
-): Promise<IRetro | undefined> {
+async function findLatestRetro(client: github.GitHub, teamName: string): Promise<IRetro | undefined> {
   core.info('Locating the last retro...')
 
   const projects = await client.projects.listForRepo({
@@ -287,9 +248,7 @@ async function findLatestRetro(
 
   core.info(`Found ${projects.data.length} projects in this repo`)
 
-  const parseRetro = (
-    proj: Octokit.ProjectsListForRepoResponseItem
-  ): IRetro => {
+  const parseRetro = (proj: Octokit.ProjectsListForRepoResponseItem): IRetro => {
     const info = parseProjectDescription(proj.body)
 
     return {
@@ -340,11 +299,7 @@ function newDate(offsetDays: number = 0, atMidnight: boolean = false): Date {
  * @param retroDayOfWeek the day of week to schedule the retro, from 0-7 where 0 is Sunday
  * @param retroCadenceInWeeks the frequency of retros, in weeks
  */
-export function nextDate(
-  lastRetroDate: Date,
-  retroDayOfWeek: number,
-  retroCadenceInWeeks: number
-): Date {
+export function nextDate(lastRetroDate: Date, retroDayOfWeek: number, retroCadenceInWeeks: number): Date {
   let date = new Date(lastRetroDate)
   date.setDate(date.getDate() + retroCadenceInWeeks * 7)
 
@@ -380,7 +335,7 @@ function toReadableDate(date: Date): string {
  * @param view the view for rendering the template
  */
 function createTitle(template: string, view: any): string {
-  const result =  mustache.render(template, view)
+  const result = mustache.render(template, view)
   core.info(`Creating title: template: '${template}', result: '${result}'`)
   return result
 }
@@ -391,11 +346,7 @@ function createTitle(template: string, view: any): string {
  * @param client the GitHub client
  * @param retro the retro to close
  */
-async function closeBoard(
-  client: github.GitHub,
-  retro: IRetro,
-  onlyLog: boolean
-): Promise<void> {
+async function closeBoard(client: github.GitHub, retro: IRetro, onlyLog: boolean): Promise<void> {
   if (!onlyLog) {
     await client.projects.update({
       project_id: retro.projectId,
@@ -454,20 +405,10 @@ async function createBoard(
   }
 
   if (!columnNames.length) {
-    columnNames = [
-      'Went well',
-      'Went meh',
-      'Could have gone better',
-      'Action items!'
-    ]
+    columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!']
   }
 
-  const columnMap = await populateColumns(
-    client,
-    projectId,
-    columnNames,
-    onlyLog
-  )
+  const columnMap = await populateColumns(client, projectId, columnNames, onlyLog)
 
   if (cards) {
     await populateCards(client, cards, view, columnMap, onlyLog)
@@ -478,16 +419,12 @@ async function createBoard(
 
 /**
  * Generates a view object used to render the Mustache templates.
- * 
+ *
  * @param retroInfo the current retro info
  * @param lastRetro the last retro
  * @param futureDriver the GitHub handle of the next retro driver
  */
-function createView(
-  retroInfo: IRetroInfo,
-  lastRetro: IRetro | undefined,
-  futureDriver: string
-): any {
+function createView(retroInfo: IRetroInfo, lastRetro: IRetro | undefined, futureDriver: string): any {
   const view: any = {
     date: toReadableDate(retroInfo.date),
     driver: retroInfo.driver,
@@ -509,7 +446,7 @@ function createView(
 
 /**
  * Populates the columns on the project board.
- * 
+ *
  * @param client the GitHub client
  * @param projectId the project board id
  * @param columnNames the names of the columns
@@ -541,7 +478,7 @@ async function populateColumns(
 
 /**
  * Populates any custom cards on the project board.
- * 
+ *
  * @param client the GitHub client
  * @param cards formatted string specifying the cards to generate
  * @param view the view for rendering mustache templates

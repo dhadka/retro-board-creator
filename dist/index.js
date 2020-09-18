@@ -5067,29 +5067,29 @@ Best Regards,
 
 Retrobot`;
 const defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
-function parseCommaSeparatedString(s) {
+function parseCSV(s) {
     if (!s)
         return [];
     return s.split(',').map(l => l.trim());
 }
 function run() {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Starting retro creator');
         try {
             const args = {
                 repoToken: core.getInput('repo-token', { required: true }),
                 teamName: core.getInput('team-name'),
-                handles: parseCommaSeparatedString(core.getInput('handles', { required: true })),
+                handles: parseCSV(core.getInput('handles', { required: true })),
                 retroCadenceInWeeks: (_a = parseInt(core.getInput('retro-cadence-weeks')), (_a !== null && _a !== void 0 ? _a : 1)),
                 retroDayOfWeek: (_b = parseInt(core.getInput('retro-day-of-week')), (_b !== null && _b !== void 0 ? _b : 5)),
-                titleTemplate: (_c = core.getInput('title-template'), (_c !== null && _c !== void 0 ? _c : defaultTitleTemplate)),
+                titleTemplate: core.getInput('title-template') || defaultTitleTemplate,
                 notificationUrl: core.getInput('notification-url'),
-                notificationTemplate: (_d = core.getInput('notification-template'), (_d !== null && _d !== void 0 ? _d : defaultNotificationTemplate)),
-                closeAfterDays: (_e = parseInt(core.getInput('close-after-days')), (_e !== null && _e !== void 0 ? _e : 0)),
+                notificationTemplate: core.getInput('notification-template') || defaultNotificationTemplate,
+                closeAfterDays: (_c = parseInt(core.getInput('close-after-days')), (_c !== null && _c !== void 0 ? _c : 0)),
                 createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
-                issueTemplate: (_f = core.getInput('issue-template'), (_f !== null && _f !== void 0 ? _f : defaultIssueTemplate)),
-                columns: parseCommaSeparatedString(core.getInput('columns')),
+                issueTemplate: core.getInput('issue-template') || defaultIssueTemplate,
+                columns: parseCSV(core.getInput('columns')),
                 cards: core.getInput('cards'),
                 onlyLog: core.getInput('only-log') === 'true'
             };
@@ -10041,12 +10041,7 @@ function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog
             projectUrl = project.data.html_url;
         }
         if (!columnNames.length) {
-            columnNames = [
-                'Went well',
-                'Went meh',
-                'Could have gone better',
-                'Action items!'
-            ];
+            columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
         }
         const columnMap = yield populateColumns(client, projectId, columnNames, onlyLog);
         if (cards) {
