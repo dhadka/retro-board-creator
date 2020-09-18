@@ -66,6 +66,11 @@ type IRetro = IRetroInfo & {
    * The project board id used by the GitHub client.
    */
   projectId: number
+
+  /**
+   * The state of the project.
+   */
+  state: string
 }
 
 type KeyToIdMap = {[key: string]: number}
@@ -98,7 +103,7 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   }
 
   if (args.onlyLog) {
-    core.info('Running in debug mode, will only log messages')
+    core.info('only-log is set, will not make any changes')
   }
 
   const client = new github.GitHub(args.repoToken)
@@ -189,11 +194,11 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   // Close the last retro.
   if (
     lastRetro &&
+    lastRetro.state === 'open' &&
     args.closeAfterDays > 0 &&
     lastRetro.date < newDate(-args.closeAfterDays)
   ) {
     await closeBoard(client, lastRetro, args.onlyLog)
-    core.info(`Closed previous retro from ${lastRetro.date}`)
   }
 }
 
@@ -291,6 +296,7 @@ async function findLatestRetro(
       title: proj.name,
       url: proj.html_url,
       projectId: proj.id,
+      state: proj.state,
       date: info.date,
       team: info.team,
       driver: info.driver,
@@ -374,7 +380,9 @@ function toReadableDate(date: Date): string {
  * @param view the view for rendering the template
  */
 function createTitle(template: string, view: any): string {
-  return mustache.render(template, view)
+  const result =  mustache.render(template, view)
+  core.info(`Creating title: template: '${template}', result: '${result}'`)
+  return result
 }
 
 /**
@@ -468,6 +476,13 @@ async function createBoard(
   return projectUrl
 }
 
+/**
+ * Generates a view object used to render the Mustache templates.
+ * 
+ * @param retroInfo the current retro info
+ * @param lastRetro the last retro
+ * @param futureDriver the GitHub handle of the next retro driver
+ */
 function createView(
   retroInfo: IRetroInfo,
   lastRetro: IRetro | undefined,
@@ -492,6 +507,14 @@ function createView(
   return view
 }
 
+/**
+ * Populates the columns on the project board.
+ * 
+ * @param client the GitHub client
+ * @param projectId the project board id
+ * @param columnNames the names of the columns
+ * @param onlyLog if true, will not add any columns to the board
+ */
 async function populateColumns(
   client: github.GitHub,
   projectId: number,
@@ -516,6 +539,15 @@ async function populateColumns(
   return columnMap
 }
 
+/**
+ * Populates any custom cards on the project board.
+ * 
+ * @param client the GitHub client
+ * @param cards formatted string specifying the cards to generate
+ * @param view the view for rendering mustache templates
+ * @param columnMap map of column names to ids
+ * @param onlyLog if true, will not add any cards to the project board
+ */
 async function populateCards(
   client: github.GitHub,
   cards: string,

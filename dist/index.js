@@ -9784,7 +9784,7 @@ function tryCreateRetro(args) {
             throw Error('requires at least one handle');
         }
         if (args.onlyLog) {
-            core.info('Running in debug mode, will only log messages');
+            core.info('only-log is set, will not make any changes');
         }
         const client = new github.GitHub(args.repoToken);
         const today = newDate(0, true);
@@ -9826,10 +9826,10 @@ function tryCreateRetro(args) {
         }
         // Close the last retro.
         if (lastRetro &&
+            lastRetro.state === 'open' &&
             args.closeAfterDays > 0 &&
             lastRetro.date < newDate(-args.closeAfterDays)) {
             yield closeBoard(client, lastRetro, args.onlyLog);
-            core.info(`Closed previous retro from ${lastRetro.date}`);
         }
     });
 }
@@ -9912,6 +9912,7 @@ function findLatestRetro(client, teamName) {
                 title: proj.name,
                 url: proj.html_url,
                 projectId: proj.id,
+                state: proj.state,
                 date: info.date,
                 team: info.team,
                 driver: info.driver,
@@ -9981,7 +9982,9 @@ function toReadableDate(date) {
  * @param view the view for rendering the template
  */
 function createTitle(template, view) {
-    return mustache.render(template, view);
+    const result = mustache.render(template, view);
+    core.info(`Creating title: template: '${template}', result: '${result}'`);
+    return result;
 }
 /**
  * Closes the last retro board.
@@ -10052,6 +10055,13 @@ function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog
         return projectUrl;
     });
 }
+/**
+ * Generates a view object used to render the Mustache templates.
+ *
+ * @param retroInfo the current retro info
+ * @param lastRetro the last retro
+ * @param futureDriver the GitHub handle of the next retro driver
+ */
 function createView(retroInfo, lastRetro, futureDriver) {
     const view = {
         date: toReadableDate(retroInfo.date),
@@ -10069,6 +10079,14 @@ function createView(retroInfo, lastRetro, futureDriver) {
     }
     return view;
 }
+/**
+ * Populates the columns on the project board.
+ *
+ * @param client the GitHub client
+ * @param projectId the project board id
+ * @param columnNames the names of the columns
+ * @param onlyLog if true, will not add any columns to the board
+ */
 function populateColumns(client, projectId, columnNames, onlyLog) {
     return __awaiter(this, void 0, void 0, function* () {
         const columnMap = {};
@@ -10085,6 +10103,15 @@ function populateColumns(client, projectId, columnNames, onlyLog) {
         return columnMap;
     });
 }
+/**
+ * Populates any custom cards on the project board.
+ *
+ * @param client the GitHub client
+ * @param cards formatted string specifying the cards to generate
+ * @param view the view for rendering mustache templates
+ * @param columnMap map of column names to ids
+ * @param onlyLog if true, will not add any cards to the project board
+ */
 function populateCards(client, cards, view, columnMap, onlyLog) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!cards) {
