@@ -73,8 +73,6 @@ type IRetro = IRetroInfo & {
   state: string
 }
 
-type KeyToIdMap = {[key: string]: number}
-
 /**
  * Performs all the functionality to create the retros, including:
  *
@@ -423,6 +421,7 @@ async function createBoard(
  * @param lastRetro the last retro
  * @param futureDriver the GitHub handle of the next retro driver
  */
+/* eslint-disable @typescript-eslint/promise-function-async */
 function createView(retroInfo: IRetroInfo, lastRetro: IRetro | undefined, futureDriver: string): any {
   const view: any = {
     date: toReadableDate(retroInfo.date),
@@ -456,8 +455,8 @@ async function populateColumns(
   projectId: number,
   columnNames: string[],
   onlyLog: boolean
-): Promise<KeyToIdMap> {
-  const columnMap: KeyToIdMap = {}
+): Promise<{[key: string]: number}> {
+  const columnMap: {[key: string]: number} = {}
 
   for (const name of columnNames) {
     core.info(`Creating column '${name}'`)
@@ -488,7 +487,7 @@ async function populateCards(
   client: github.GitHub,
   cards: string,
   view: any,
-  columnMap: KeyToIdMap,
+  columnMap: {[key: string]: number},
   onlyLog: boolean
 ): Promise<void> {
   if (!cards) {
