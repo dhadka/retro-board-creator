@@ -18,4 +18,11 @@ jobs:
         retro-day-of-week: 3
         close-after-days: 7
         create-tracking-issue: true
+        columns: Shoutouts, What went well, What could be better, Action items!
+        cards: |
+          Retrobot is now creating retros! => Shoutouts
+          Today's retro driver: {{ driver }} => Action items!
+          Next retro driver: {{ next-driver }} => Action items!
+          {{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => Action items!
+          This card won't get rendered => Missing column
         only-log: true
