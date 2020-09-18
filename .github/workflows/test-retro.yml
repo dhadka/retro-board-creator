@@ -23,5 +23,4 @@ jobs:
           Retrobot is now creating retros! => Shoutouts
           Today's retro driver: {{ driver }} => Action items!
           Next retro driver: {{ next-driver }} => Action items!
-          {{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => Action items!
-          This card won't get rendered => Missing column
+          {{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }} => Action items!
