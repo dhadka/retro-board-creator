@@ -25,4 +25,3 @@ jobs:
           Next retro driver: {{ next-driver }} => Action items!
           {{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => Action items!
           This card won't get rendered => Missing column
-        only-log: true
