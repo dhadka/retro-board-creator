@@ -1,0 +1,21 @@
+name: Create Retro Board
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-board:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Create the retrospective board and issue
+      uses: dhadka/retrobot@flexible-cards
+      with: 
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        team-name: My Team
+        handles: dhadka
+        retro-cadence-weeks: 2
+        retro-day-of-week: 3
+        close-after-days: 7
+        create-tracking-issue: true
+        onlyLog: true
