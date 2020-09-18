@@ -463,9 +463,9 @@ async function createBoard(
     // TODO: For backwards compat, create default cards
     const lastColumnName = columnNames[columnNames.length-1]
 
-    cards = `{{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => ${lastColumnName}
-Next retro driver: {{ next-driver }} => ${lastColumnName}
-Today's retro driver: {{ driver }} => ${lastColumnName}`
+    cards = `Today's retro driver: {{ driver }} => ${lastColumnName}
+      Next retro driver: {{ next-driver }} => ${lastColumnName}
+      {{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => ${lastColumnName}`
   }
 
   if (cards) {
@@ -555,7 +555,7 @@ async function populateCards(
     return
   }
 
-  for (const card of cards.split('\n').map(c => c.trim())) {
+  for (const card of cards.split('\n').map(c => c.trim()).reverse()) {
     const parts = card.split('=>').map(p => p.trim())
 
     const text = mustache.render(parts[0], view)

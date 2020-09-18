@@ -10041,9 +10041,9 @@ function createBoard(client, title, retroInfo, lastRetro, futureDriver, columnNa
         if (!cards && columnNames.length > 0) {
             // TODO: For backwards compat, create default cards
             const lastColumnName = columnNames[columnNames.length - 1];
-            cards = `{{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => ${lastColumnName}
-Next retro driver: {{ next-driver }} => ${lastColumnName}
-Today's retro driver: {{ driver }} => ${lastColumnName}`;
+            cards = `Today's retro driver: {{ driver }} => ${lastColumnName}
+      Next retro driver: {{ next-driver }} => ${lastColumnName}
+      {{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => ${lastColumnName}`;
         }
         if (cards) {
             const view = createView(title, retroInfo, lastRetro, futureDriver);
@@ -10093,7 +10093,7 @@ function populateCards(client, cards, view, columnMap, logOnly) {
             core.info('No cards to render');
             return;
         }
-        for (const card of cards.split('\n').map(c => c.trim())) {
+        for (const card of cards.split('\n').map(c => c.trim()).reverse()) {
             const parts = card.split('=>').map(p => p.trim());
             const text = mustache.render(parts[0], view);
             const column = parts[1];
