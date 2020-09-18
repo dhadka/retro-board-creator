@@ -10,10 +10,12 @@ export interface IRetroArguments {
   handles: string[]
   retroCadenceInWeeks: number
   retroDayOfWeek: number
-  retroTitle: string
+  titleTemplate: string
   notificationUrl: string
+  notificationTemplate: string
   closeAfterDays: number
   createTrackingIssue: boolean
+  issueTemplate: string
   columns: string[]
   cards: string
   onlyLog: boolean
@@ -110,20 +112,22 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     )
   }
 
-  // If there is already a scheduled retro in the future...
+  // If there is already a scheduled retro in the future.
   if (lastRetro && lastRetro.date > today) {
     if (lastRetro.date < tomorrow) {
       core.info('Retro happening today, sending notification')
-
-      if (!args.onlyLog) {
-        await sendNotification(args.notificationUrl, lastRetro)
-      }
+      await sendNotification(
+        args.notificationUrl,
+        args.notificationTemplate,
+        lastRetro,
+        args.onlyLog
+      )
     }
 
     return
   }
 
-  // Otherwise, the scheduled retro is in the past or no retro found...
+  // Otherwise, there was no previous retro or it occurred in the past.
   const lastRetroDate = lastRetro ? lastRetro.date : new Date()
   const lastRetroDriver = lastRetro ? lastRetro.driver : ''
   const lastRetroOffset = lastRetro ? lastRetro.offset : 0
@@ -146,29 +150,24 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     `Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`
   )
 
-  // Close the previous retro
-  if (
-    lastRetro &&
-    args.closeAfterDays > 0 &&
-    lastRetro.date < newDate(-args.closeAfterDays)
-  ) {
-    await closeBoard(client, lastRetro)
-    core.info(`Closed previous retro from ${lastRetro.date}`)
+  // Create the new retro and issue.
+  const newRetro: IRetroInfo = {
+    date: nextRetroDate,
+    team: args.teamName,
+    driver: nextRetroDriver,
+    offset: args.handles.indexOf(nextRetroDriver)
   }
+
+  const view = createView(newRetro, lastRetro, futureRetroDriver)
+  const title = createTitle(args.titleTemplate, view)
 
   const projectUrl = await createBoard(
     client,
-    getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
-    {
-      date: nextRetroDate,
-      team: args.teamName,
-      driver: nextRetroDriver,
-      offset: args.handles.indexOf(nextRetroDriver)
-    },
-    lastRetro,
-    futureRetroDriver,
+    title,
+    newRetro,
     args.columns,
     args.cards,
+    view,
     args.onlyLog
   )
 
@@ -177,14 +176,24 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   if (args.createTrackingIssue) {
     const issueUrl = await createTrackingIssue(
       client,
-      projectUrl,
-      getFullRetroTitle(args.retroTitle, nextRetroDate, args.teamName),
-      nextRetroDate,
-      nextRetroDriver,
+      newRetro.driver,
+      title,
+      args.issueTemplate,
+      view,
       args.onlyLog
     )
 
     core.info(`Created tracking issue at ${issueUrl}`)
+  }
+
+  // Close the last retro.
+  if (
+    lastRetro &&
+    args.closeAfterDays > 0 &&
+    lastRetro.date < newDate(-args.closeAfterDays)
+  ) {
+    await closeBoard(client, lastRetro, args.onlyLog)
+    core.info(`Closed previous retro from ${lastRetro.date}`)
   }
 }
 
@@ -361,24 +370,11 @@ function toReadableDate(date: Date): string {
 /**
  * Returns the title of the retro.
  *
- * @param retroTitle custom title text, or '' to use the default
- * @param retroDate the date of the retro
- * @param teamName the team name, or '' if no team is set
+ * @param template the mustache template for the title
+ * @param view the view for rendering the template
  */
-function getFullRetroTitle(
-  retroTitle: string,
-  retroDate: Date,
-  teamName: string
-): string {
-  const readableDate = toReadableDate(retroDate)
-
-  if (retroTitle) {
-    return `${retroTitle}${readableDate}`
-  } else if (teamName) {
-    return `${teamName} Retro on ${readableDate}`
-  } else {
-    return `Retro on ${readableDate}`
-  }
+function createTitle(template: string, view: any): string {
+  return mustache.render(template, view)
 }
 
 /**
@@ -387,11 +383,17 @@ function getFullRetroTitle(
  * @param client the GitHub client
  * @param retro the retro to close
  */
-async function closeBoard(client: github.GitHub, retro: IRetro): Promise<void> {
-  await client.projects.update({
-    project_id: retro.projectId,
-    state: 'closed'
-  })
+async function closeBoard(
+  client: github.GitHub,
+  retro: IRetro,
+  onlyLog: boolean
+): Promise<void> {
+  if (!onlyLog) {
+    await client.projects.update({
+      project_id: retro.projectId,
+      state: 'closed'
+    })
+  }
 }
 
 /**
@@ -410,24 +412,24 @@ async function closeBoard(client: github.GitHub, retro: IRetro): Promise<void> {
  * @param client the GitHub client
  * @param title the title of the retro
  * @param retroInfo information used to create and schedule the new retro
- * @param lastRetro the last retro, or undefined
- * @param futureDriver the retro driver for the next retro, which hasn't been scheduled yet
  * @param columnNames custom column names, or [] to use the defaults
+ * @param cards formatted string describing any custom cards to populate on the board
+ * @param view the view used to render any mustache templates
+ * @param onlyLog if true, will not create the board
  */
 async function createBoard(
   client: github.GitHub,
   title: string,
   retroInfo: IRetroInfo,
-  lastRetro: IRetro | undefined,
-  futureDriver: string,
   columnNames: string[],
   cards: string,
-  logOnly: boolean
+  view: any,
+  onlyLog: boolean
 ): Promise<string> {
   let projectId = 0
   let projectUrl = ''
 
-  if (!logOnly) {
+  if (!onlyLog) {
     const project = await client.projects.createForRepo({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
@@ -456,55 +458,26 @@ async function createBoard(
     client,
     projectId,
     columnNames,
-    logOnly
+    onlyLog
   )
 
-  if (!cards && columnNames.length > 0) {
-    // TODO: For backwards compat, create default cards
-    const lastColumnName = columnNames[columnNames.length-1]
-
-    cards = `Today's retro driver: {{ driver }} => ${lastColumnName}
-      Next retro driver: {{ next-driver }} => ${lastColumnName}
-      {{ #last-retro }}Last retro: {{ url }}{{ /last-retro }} => ${lastColumnName}`
-  }
-
   if (cards) {
-    const view = createView(title, retroInfo, lastRetro, futureDriver)
-    await populateCards(client, cards, view, columnMap, logOnly)
+    await populateCards(client, cards, view, columnMap, onlyLog)
   }
 
   return projectUrl
 }
 
-interface ILastRetroView {
-  title: string
-  date: string
-  driver: string
-  url: string
-}
-
-interface IRetroView {
-  title: string
-  date: string
-  driver: string
-  team: string
-  'next-driver': string
-  'last-retro': ILastRetroView | undefined
-}
-
 function createView(
-  title: string,
   retroInfo: IRetroInfo,
   lastRetro: IRetro | undefined,
   futureDriver: string
-): IRetroView {
-  const view: IRetroView = {
-    title,
+): any {
+  const view: any = {
     date: toReadableDate(retroInfo.date),
     driver: retroInfo.driver,
     team: retroInfo.team,
-    'next-driver': futureDriver,
-    'last-retro': undefined
+    'next-driver': futureDriver
   }
 
   if (lastRetro) {
@@ -523,14 +496,14 @@ async function populateColumns(
   client: github.GitHub,
   projectId: number,
   columnNames: string[],
-  logOnly: boolean
+  onlyLog: boolean
 ): Promise<KeyToIdMap> {
   const columnMap: KeyToIdMap = {}
 
   for (const name of columnNames) {
     core.info(`Creating column '${name}'`)
 
-    if (!logOnly) {
+    if (!onlyLog) {
       const column = await client.projects.createColumn({
         project_id: projectId,
         name
@@ -546,16 +519,19 @@ async function populateColumns(
 async function populateCards(
   client: github.GitHub,
   cards: string,
-  view: IRetroView,
+  view: any,
   columnMap: KeyToIdMap,
-  logOnly: boolean
+  onlyLog: boolean
 ): Promise<void> {
   if (!cards) {
     core.info('No cards to render')
     return
   }
 
-  for (const card of cards.split('\n').map(c => c.trim()).reverse()) {
+  for (const card of cards
+    .split('\n')
+    .map(c => c.trim())
+    .reverse()) {
     const parts = card.split('=>').map(p => p.trim())
 
     const text = mustache.render(parts[0], view)
@@ -564,7 +540,7 @@ async function populateCards(
     if (text) {
       core.info(`Adding card '${text}' to column '${column}'`)
 
-      if (!logOnly) {
+      if (!onlyLog) {
         const columnId = columnMap[column]
 
         if (columnId) {
@@ -586,43 +562,35 @@ async function populateCards(
  * Creates a tracking issue for the retro driver.
  *
  * @param client the GitHub client
- * @param projectUrl the project board url
- * @param title the title of the retro
- * @param retroDate the date of the retro
- * @param retroDriver the GitHub handle of the retro driver
+ * @param title the issue title
+ * @param assignee the GitHub handle of the retro driver
+ * @param template the mustache template used to generate the issue text
+ * @param view view for rendering the mustache template
+ * @param onlyLog if true, will not create the tracking issue
  */
 async function createTrackingIssue(
   client: github.GitHub,
-  projectUrl: string,
   title: string,
-  retroDate: Date,
-  retroDriver: string,
-  logOnly: boolean
+  assignee: string,
+  template: string,
+  view: any,
+  onlyLog: boolean
 ): Promise<string> {
-  const readableDate = toReadableDate(retroDate)
   let issueUrl = ''
 
-  if (!logOnly) {
+  if (!onlyLog) {
     const issue = await client.issues.create({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       title,
-      body: `Hey @${retroDriver},
-      
-  You are scheduled to drive the next retro on ${readableDate}. The retro board has been created at ${projectUrl}. Please remind the team beforehand to fill out their cards.
-
-  Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
-
-  Best Regards,
-
-  Retrobot`
+      body: mustache.render(template, view)
     })
 
     await client.issues.addAssignees({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       issue_number: issue.data.number,
-      assignees: [retroDriver]
+      assignees: [assignee]
     })
 
     issueUrl = issue.data.html_url
@@ -635,19 +603,25 @@ async function createTrackingIssue(
  * Sends a slack notification announcing a retro is scheduled for today.
  *
  * @param notificationUrl the incoming webhooks notification url
- * @param retro information about the upcoming retro
+ * @param notificationTemplate the mustache template used to generate the notification text
+ * @param view view for rendering the mustache template
+ * @param onlyLog if true, will not issue the notification
  */
 async function sendNotification(
   notificationUrl: string,
-  retro: IRetro
+  notificationTemplate: string,
+  view: any,
+  onlyLog: boolean
 ): Promise<void> {
-  const body = {
-    username: 'Retrobot',
-    text: `<!here|here> A retro is scheduled for today! Visit <${retro.url}|the retro board> to add your cards. CC retro driver @${retro.driver}.`,
-    icon_emoji: ':rocket:',
-    link_names: 1
-  }
+  if (!onlyLog) {
+    const body = {
+      username: 'Retrobot',
+      text: mustache.render(notificationTemplate, view),
+      icon_emoji: ':rocket:',
+      link_names: 1
+    }
 
-  const res = await axios.post(notificationUrl, body)
-  core.info(res.statusText)
+    const res = await axios.post(notificationUrl, body)
+    core.info(res.statusText)
+  }
 }

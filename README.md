@@ -30,7 +30,7 @@ jobs:
         cards: |
           "Retro created by retrobot" => Went well
           "Current retro driver: {{ current_driver }} => Action items!
-          
+
 ```
 
 ## Custom options
@@ -41,17 +41,49 @@ jobs:
 
 **`retro-day-of-week`** - The day of the week to hold the retro. `0` is Sunday, `1` is Monday, and so on.  The default is `5` (Friday).
 
-**`retro-title`** - Custom title to use for the retro. The date of the retro is appended.  The default is `Retro on `.
+**`title-template`** - Template used to generate the retro title.
 
 **`notification-url`** - Slack incoming webhooks url to send a notification the day of the retro.  This requires the Action schedule trigger to be configured to run a few hours before the start of the retro.
+
+**`notification-template`** - Template used to generate the notification text.
 
 **`close-after-days`** - When set, the previous retro board will be automatically closed after the given number of days.
 
 **`create-tracking-issue`** - If `true`, will create a tracking issue for the upcoming retro and assign it to the driver.  Default is `false`.
 
-**`columns`** - Comma separated list of column names. If not specified, defaults to `"Went well", "Went meh", "Could have gone better", Action items!"`.  The last column is prepopulated with cards indicating the current and next retro driver.
+**`issue-template`** - Template used to generate the body of the issue.
+
+**`columns`** - Comma separated list of column names. If not specified, defaults to `"Went well", "Went meh", "Could have gone better", Action items!"`.
+
+**`cards`** - Custom cards added to the project board.  This is input as a multiline string, where each line represents a card.  The format of a card is `<note> => <column_name>`.  For example:
+
+```
+with:
+  cards: |
+    Current retro driver: {{ driver }} => Action items!
+    Next retro driver: {{ next-driver }} => Action items!
+    {{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }} => Action items!
+```
 
 **`only-log`** - Log what actions would be performed, but do not actually create the retro board, issue, or notifications.  Useful for testing.
+
+## Template rendering
+
+Retrobot uses Mustache to render templates.  Reference any variable below with `{{ variable_name }}` in the template string.  The following variables are available:
+
+* `date` - The date of the retro
+* `driver` - The GitHub handle of the retro driver
+* `team` - The team name (if set)
+* `next-driver` - The GitHub handle of the following retro driver
+
+In addition, if a previous retro is found, the `last-retro` variable will be set which contains
+
+* `title` - The title of the previous retro
+* `date` - The date of the previous retro
+* `driver` - The GitHub handle of the previous retro driver
+* `url` - The url to the previous retro's project board
+
+You can reference these variables using `{{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }}`.  If `last-retro` does not exist, the entire contents of the string will not be rendered.  Also note the use of three brackets `{{{ ... }}}` for the url.  This prevents escaping the contents of the URL.
 
 ## Changing the schedule
 
