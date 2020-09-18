@@ -5059,14 +5059,14 @@ const retro_1 = __webpack_require__(478);
 const defaultTitleTemplate = '{{ team }} Retro on {{{ date }}}';
 const defaultIssueTemplate = `Hey {{ driver }},
       
-You are scheduled to drive the next retro on {{ date }}. The retro board has been created at {{ url }}. Please remind the team beforehand to fill out their cards.
+You are scheduled to drive the next retro on {{ date }}. The retro board has been created at {{{ url }}}. Please remind the team beforehand to fill out their cards.
 
 Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
 
 Best Regards,
 
 Retrobot`;
-const defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{ url }}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
+const defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
 function parseCSV(s) {
     if (!s)
         return [];
@@ -9985,7 +9985,7 @@ function toReadableDate(date) {
  */
 function createTitle(template, view) {
     const result = mustache.render(template, view);
-    core.info(`Creating title: template: '${template}', result: '${result}'`);
+    core.info(`Using title '${result}'`);
     return result;
 }
 /**

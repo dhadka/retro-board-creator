@@ -335,7 +335,7 @@ function toReadableDate(date: Date): string {
  */
 function createTitle(template: string, view: any): string {
   const result = mustache.render(template, view)
-  core.info(`Creating title: template: '${template}', result: '${result}'`)
+  core.info(`Using title '${result}'`)
   return result
 }
 
