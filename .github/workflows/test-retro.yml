@@ -18,4 +18,4 @@ jobs:
         retro-day-of-week: 3
         close-after-days: 7
         create-tracking-issue: true
-        onlyLog: true
+        only-log: true
