@@ -1,15 +1,17 @@
 # Retrobot
 
+Retrobot automates the creation of retrospective boards on GitHub.  In addition to creating the board, it can also create a tracking issue assigned to the retro driver and send a Slack notification the day of the retro.
+
+## Development history
+
 Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/hross/retro-board-creator), with the following additions:
 
 1. Adds `team-name` input to distinguish multiple teams using the same repo.
 2. Stores and reads the current retro settings in the project description (encoded as JSON).
-3. Option to populate board with custom cards.
+3. Option to populate board with custom columns and cards.
 4. Option to send slack notifications on the day of the retro.
 5. Option to close prior retro boards.
-6. Option to customize the retro board columns.
-7. Everything is customizable via mustache templates with `{{ variable }}` rendering
-
+6. Everything is customizable via mustache templates with `{{ variable }}` rendering
 
 ## Example workflow
 
@@ -27,11 +29,6 @@ jobs:
       with: 
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         handles: alice,bob,charlie,denise,erica
-        columns: Went well, Went meh, Could have been better, Action items!
-        cards: |
-          "Retro created by retrobot" => Went well
-          "Current retro driver: {{ current_driver }} => Action items!
-
 ```
 
 ## Custom options
@@ -87,7 +84,7 @@ In addition, if a previous retro is found, the `last-retro` variable will be set
 
 You can reference these variables using `{{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }}`.  If `last-retro` does not exist, the entire contents of the string will not be rendered.
 
-**Note: Mustache automatically escapes strings for HTML. Disable escaping by using three brackets `{{{ ... }}}`.  This is good for urls and dates.**
+**Note: Mustache automatically escapes strings for HTML. Disable escaping by using three brackets `{{{ ... }}}`.  This is recommended for urls and dates.**
 
 ## Changing the schedule
 
