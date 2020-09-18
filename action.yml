@@ -1,6 +1,6 @@
-name: 'Retro Creator'
+name: 'Retrobot'
 description: 'Create retro boards automagically on a schedule'
-author: 'hross'
+author: 'GitHub Actions'
 inputs:
   repo-token:
     description: 'Token for the repository. Can be passed in using `{{ secrets.GITHUB_TOKEN }}`.'
@@ -10,25 +10,42 @@ inputs:
     required: true
   team-name:
     description: 'Team name for the retro.'
+    required: false
   retro-cadence-weeks:
     description: 'The frequency of retros, in weeks.'
+    required: false
     default: 1
   retro-day-of-week:
     description: 'The day of the week to schedule a retro on. Default is Friday.'
+    required: false
     default: 5
-  retro-title:
-    description: 'Custom title for the retro.'
+  title-template:
+    description: 'Template used to generate the retro title. Can use {{ mustache }} inputs to render variables.'
+    required: false
   notification-url:
     description: 'Slack incoming webhooks URL to send notifications the day of the retro.'
+    required: false
+  notification-template:
+    description: 'Template used to generate Slack notifications. Can use {{ mustache }} inputs to render variables.'
   close-after-days:
-    description: 'Close old retro boards after N days'
+    description: 'Close old retro boards after N days.'
+    required: false
   create-tracking-issue:
     description: 'If true, creates a tracking issue and assigns to the retro driver.'
+    required: false
     default: false
+  issue-template:
+    description: 'Template used to generate the issue text. Can use {{ mustache }} inputs to render variables.'
+    required: false
   columns:
     description: 'The columns to create.'
+    required: false
+  cards:
+    description: 'The cards to populate the retro with. Can use {{ mustache }} inputs to render variables.'
+    required: false
   only-log:
     description: 'Run in text output only mode. Do not actually create a retro board/issue.'
+    required: false
     default: false
 runs:
   using: 'node12'
