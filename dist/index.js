@@ -5067,31 +5067,42 @@ Best Regards,
 
 Retrobot`;
 const defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
-function parseCSV(s) {
-    if (!s)
+function getList(name, options) {
+    const value = getString(name, options);
+    if (!value)
         return [];
-    return s.split(',').map(l => l.trim());
+    return value.split(',').map(l => l.trim());
+}
+function getString(name, options) {
+    var _a, _b;
+    return core.getInput(name, options) || (_b = (_a = options) === null || _a === void 0 ? void 0 : _a.default, (_b !== null && _b !== void 0 ? _b : ''));
+}
+function getInt(name, options) {
+    var _a, _b, _c;
+    return _c = (_a = parseInt(core.getInput(name, options)), (_a !== null && _a !== void 0 ? _a : (_b = options) === null || _b === void 0 ? void 0 : _b.default)), (_c !== null && _c !== void 0 ? _c : NaN);
+}
+function getBoolean(name, options) {
+    return getString(name, options).toLowerCase() === 'true';
 }
 function run() {
-    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Starting retro creator');
         try {
             const args = {
-                repoToken: core.getInput('repo-token', { required: true }),
-                teamName: core.getInput('team-name'),
-                handles: parseCSV(core.getInput('handles', { required: true })),
-                retroCadenceInWeeks: (_a = parseInt(core.getInput('retro-cadence-weeks')), (_a !== null && _a !== void 0 ? _a : 1)),
-                retroDayOfWeek: (_b = parseInt(core.getInput('retro-day-of-week')), (_b !== null && _b !== void 0 ? _b : 5)),
-                titleTemplate: core.getInput('title-template') || defaultTitleTemplate,
-                notificationUrl: core.getInput('notification-url'),
-                notificationTemplate: core.getInput('notification-template') || defaultNotificationTemplate,
-                closeAfterDays: (_c = parseInt(core.getInput('close-after-days')), (_c !== null && _c !== void 0 ? _c : 0)),
-                createTrackingIssue: core.getInput('create-tracking-issue') === 'true',
-                issueTemplate: core.getInput('issue-template') || defaultIssueTemplate,
-                columns: parseCSV(core.getInput('columns')),
-                cards: core.getInput('cards'),
-                onlyLog: core.getInput('only-log') === 'true'
+                repoToken: getString('repo-token', { required: true }),
+                teamName: getString('team-name'),
+                handles: getList('handles', { required: true }),
+                retroCadenceInWeeks: getInt('retro-cadence-weeks', { default: 1 }),
+                retroDayOfWeek: getInt('retro-day-of-week', { default: 5 }),
+                titleTemplate: getString('title-template', { default: defaultTitleTemplate }),
+                notificationUrl: getString('notification-url'),
+                notificationTemplate: getString('notification-template', { default: defaultNotificationTemplate }),
+                closeAfterDays: getInt('close-after-days', { default: 0 }),
+                createTrackingIssue: getBoolean('create-tracking-issue'),
+                issueTemplate: getString('issue-template', { default: defaultIssueTemplate }),
+                columns: getList('columns'),
+                cards: getString('cards'),
+                onlyLog: getBoolean('only-log')
             };
             core.info('Arguments parsed. Starting creation.');
             yield retro_1.tryCreateRetro(args);
@@ -9814,24 +9825,32 @@ function tryCreateRetro(args) {
             date: nextRetroDate,
             team: args.teamName,
             driver: nextRetroDriver,
-            offset: args.handles.indexOf(nextRetroDriver)
+            offset: args.handles.indexOf(nextRetroDriver),
+            issue: undefined
         };
         const view = createView(newRetro, lastRetro, futureRetroDriver);
         const title = createTitle(args.titleTemplate, view);
-        const projectUrl = yield createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog);
-        view['url'] = projectUrl;
-        core.info(`Created retro board at ${projectUrl}`);
+        view['title'] = title;
+        const board = yield createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog);
+        view['url'] = board.url;
+        core.info(`Created retro board at ${board.url}`);
         if (args.createTrackingIssue) {
-            const issueUrl = yield createTrackingIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog);
-            core.info(`Created tracking issue at ${issueUrl}`);
+            const issue = yield createIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog);
+            core.info(`Created tracking issue at ${issue.url}`);
+            newRetro.issue = issue.id;
+            yield updateBoardDescription(client, board.id, newRetro, args.onlyLog);
         }
-        // Close the last retro.
+        // Close the last retro and issue.
         if (lastRetro &&
             lastRetro.state === 'open' &&
             args.closeAfterDays > 0 &&
             lastRetro.date < newDate(-args.closeAfterDays)) {
             yield closeBoard(client, lastRetro, args.onlyLog);
             core.info(`Closed old project board from ${lastRetro.date}`);
+            if (lastRetro.issue) {
+                yield closeIssue(client, lastRetro.issue, args.onlyLog);
+                core.info(`Closed old issue referenced by project board`);
+            }
         }
     });
 }
@@ -9886,7 +9905,8 @@ function parseProjectDescription(info) {
             team: content['team'],
             date: new Date(content['date']),
             driver: content['driver'],
-            offset: parseInt(content['offset'])
+            offset: parseInt(content['offset']),
+            issue: content['issue'] ? parseInt(content['issue']) : undefined
         };
     }
     else {
@@ -9918,7 +9938,8 @@ function findLatestRetro(client, teamName) {
                 date: info.date,
                 team: info.team,
                 driver: info.driver,
-                offset: info.offset
+                offset: info.offset,
+                issue: info.issue
             };
         };
         const sorted = projects.data
@@ -10036,9 +10057,6 @@ function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog
                 name: title,
                 body: toProjectDescription(retroInfo)
             });
-            if (!project) {
-                return '';
-            }
             projectId = project.data.id;
             projectUrl = project.data.html_url;
         }
@@ -10049,7 +10067,21 @@ function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog
         if (cards) {
             yield populateCards(client, cards, view, columnMap, onlyLog);
         }
-        return projectUrl;
+        return {
+            id: projectId,
+            url: projectUrl
+        };
+    });
+}
+function updateBoardDescription(client, projectId, retroInfo, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!onlyLog) {
+            yield client.projects.update({
+                project_id: projectId,
+                body: toProjectDescription(retroInfo)
+            });
+        }
+        core.info(`Updated description of project board ${projectId}`);
     });
 }
 /**
@@ -10059,6 +10091,7 @@ function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog
  * @param lastRetro the last retro
  * @param futureDriver the GitHub handle of the next retro driver
  */
+/* eslint-disable @typescript-eslint/promise-function-async */
 function createView(retroInfo, lastRetro, futureDriver) {
     const view = {
         date: toReadableDate(retroInfo.date),
@@ -10153,15 +10186,17 @@ function populateCards(client, cards, view, columnMap, onlyLog) {
  * @param view view for rendering the mustache template
  * @param onlyLog if true, will not create the tracking issue
  */
-function createTrackingIssue(client, title, retro, template, view, onlyLog) {
+function createIssue(client, title, retro, template, view, onlyLog) {
     return __awaiter(this, void 0, void 0, function* () {
+        let issueNumber = 0;
         let issueUrl = '';
         if (!onlyLog) {
             const issue = yield client.issues.create({
                 owner: github.context.repo.owner,
                 repo: github.context.repo.repo,
                 title,
-                body: mustache.render(template, view)
+                body: mustache.render(template, view),
+                labels: ['retrobot']
             });
             yield client.issues.addAssignees({
                 owner: github.context.repo.owner,
@@ -10169,9 +10204,48 @@ function createTrackingIssue(client, title, retro, template, view, onlyLog) {
                 issue_number: issue.data.number,
                 assignees: [retro.driver]
             });
+            issueNumber = issue.data.number;
             issueUrl = issue.data.html_url;
         }
-        return issueUrl;
+        return {
+            id: issueNumber,
+            url: issueUrl
+        };
+    });
+}
+/**
+ * Close the issue.
+ *
+ * @param client the GitHub client
+ * @param issueNumber the issue number to close
+ * @param onlyLog if true, will not close the issue
+ */
+function closeIssue(client, issueNumber, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const res = yield client.issues.get({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                issue_number: issueNumber
+            });
+            if (res.data.state === 'open') {
+                if (!onlyLog) {
+                    yield client.issues.update({
+                        owner: github.context.repo.owner,
+                        repo: github.context.repo.repo,
+                        issue_number: issueNumber,
+                        state: 'closed'
+                    });
+                }
+                core.info(`Closed issue ${res.data.html_url}`);
+            }
+            else {
+                core.info(`Issue ${res.data.html_url} is already closed`);
+            }
+        }
+        catch (error) {
+            core.info(`Failed to get issue: ${error}`);
+        }
     });
 }
 /**

@@ -69,11 +69,12 @@ with:
 
 Retrobot uses Mustache to render templates.  Reference any variable below with `{{ variable_name }}` in the template string.  The following variables are available:
 
+* `title` - The title of the retro
 * `date` - The date of the retro
 * `driver` - The GitHub handle of the retro driver
+* `url` - The url to the current retro board (only available for issue creation and notifications)
 * `team` - The team name (if set)
 * `next-driver` - The GitHub handle of the following retro driver
-* `url` - The url to the current retro board (only available for issue creation and notifications)
 
 In addition, if a previous retro is found, the `last-retro` variable will be set which contains
 

@@ -45,6 +45,11 @@ interface IRetroInfo {
    * The offset number for the current retro driver.
    */
   offset: number
+
+  /**
+   * The issue id, if created.
+   */
+  issue: number | undefined
 }
 
 /**
@@ -71,6 +76,24 @@ type IRetro = IRetroInfo & {
    * The state of the project.
    */
   state: string
+}
+
+/**
+ * Identifies a specific project board.
+ */
+interface IProjectBoard {
+  id: number
+
+  url: string
+}
+
+/**
+ * Identifies a specific issue.
+ */
+interface IIssue {
+  id: number
+
+  url: string
 }
 
 /**
@@ -139,23 +162,29 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
     date: nextRetroDate,
     team: args.teamName,
     driver: nextRetroDriver,
-    offset: args.handles.indexOf(nextRetroDriver)
+    offset: args.handles.indexOf(nextRetroDriver),
+    issue: undefined
   }
 
   const view = createView(newRetro, lastRetro, futureRetroDriver)
+
   const title = createTitle(args.titleTemplate, view)
+  view['title'] = title
 
-  const projectUrl = await createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog)
-  view['url'] = projectUrl
+  const board = await createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog)
+  view['url'] = board.url
 
-  core.info(`Created retro board at ${projectUrl}`)
+  core.info(`Created retro board at ${board.url}`)
 
   if (args.createTrackingIssue) {
-    const issueUrl = await createTrackingIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog)
-    core.info(`Created tracking issue at ${issueUrl}`)
+    const issue = await createIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog)
+    core.info(`Created tracking issue at ${issue.url}`)
+
+    newRetro.issue = issue.id
+    await updateBoardDescription(client, board.id, newRetro, args.onlyLog)
   }
 
-  // Close the last retro.
+  // Close the last retro and issue.
   if (
     lastRetro &&
     lastRetro.state === 'open' &&
@@ -164,6 +193,11 @@ export async function tryCreateRetro(args: IRetroArguments): Promise<void> {
   ) {
     await closeBoard(client, lastRetro, args.onlyLog)
     core.info(`Closed old project board from ${lastRetro.date}`)
+
+    if (lastRetro.issue) {
+      await closeIssue(client, lastRetro.issue, args.onlyLog)
+      core.info(`Closed old issue referenced by project board`)
+    }
   }
 }
 
@@ -221,7 +255,8 @@ function parseProjectDescription(info: string): IRetroInfo {
       team: content['team'],
       date: new Date(content['date']),
       driver: content['driver'],
-      offset: parseInt(content['offset'])
+      offset: parseInt(content['offset']),
+      issue: content['issue'] ? parseInt(content['issue']) : undefined
     }
   } else {
     throw Error(`not a valid retro body: ${info}`)
@@ -256,7 +291,8 @@ async function findLatestRetro(client: github.GitHub, teamName: string): Promise
       date: info.date,
       team: info.team,
       driver: info.driver,
-      offset: info.offset
+      offset: info.offset,
+      issue: info.issue
     }
   }
 
@@ -381,7 +417,7 @@ async function createBoard(
   cards: string,
   view: any,
   onlyLog: boolean
-): Promise<string> {
+): Promise<IProjectBoard> {
   let projectId = 0
   let projectUrl = ''
 
@@ -392,10 +428,6 @@ async function createBoard(
       name: title,
       body: toProjectDescription(retroInfo)
     })
-
-    if (!project) {
-      return ''
-    }
 
     projectId = project.data.id
     projectUrl = project.data.html_url
@@ -411,7 +443,26 @@ async function createBoard(
     await populateCards(client, cards, view, columnMap, onlyLog)
   }
 
-  return projectUrl
+  return {
+    id: projectId,
+    url: projectUrl
+  }
+}
+
+async function updateBoardDescription(
+  client: github.GitHub,
+  projectId: number,
+  retroInfo: IRetroInfo,
+  onlyLog: boolean
+): Promise<void> {
+  if (!onlyLog) {
+    await client.projects.update({
+      project_id: projectId,
+      body: toProjectDescription(retroInfo)
+    })
+  }
+
+  core.info(`Updated description of project board ${projectId}`)
 }
 
 /**
@@ -535,14 +586,15 @@ async function populateCards(
  * @param view view for rendering the mustache template
  * @param onlyLog if true, will not create the tracking issue
  */
-async function createTrackingIssue(
+async function createIssue(
   client: github.GitHub,
   title: string,
   retro: IRetroInfo,
   template: string,
   view: any,
   onlyLog: boolean
-): Promise<string> {
+): Promise<IIssue> {
+  let issueNumber = 0
   let issueUrl = ''
 
   if (!onlyLog) {
@@ -550,7 +602,8 @@ async function createTrackingIssue(
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       title,
-      body: mustache.render(template, view)
+      body: mustache.render(template, view),
+      labels: ['retrobot']
     })
 
     await client.issues.addAssignees({
@@ -560,10 +613,48 @@ async function createTrackingIssue(
       assignees: [retro.driver]
     })
 
+    issueNumber = issue.data.number
     issueUrl = issue.data.html_url
   }
 
-  return issueUrl
+  return {
+    id: issueNumber,
+    url: issueUrl
+  }
+}
+
+/**
+ * Close the issue.
+ *
+ * @param client the GitHub client
+ * @param issueNumber the issue number to close
+ * @param onlyLog if true, will not close the issue
+ */
+async function closeIssue(client: github.GitHub, issueNumber: number, onlyLog: boolean): Promise<void> {
+  try {
+    const res = await client.issues.get({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: issueNumber
+    })
+
+    if (res.data.state === 'open') {
+      if (!onlyLog) {
+        await client.issues.update({
+          owner: github.context.repo.owner,
+          repo: github.context.repo.repo,
+          issue_number: issueNumber,
+          state: 'closed'
+        })
+      }
+
+      core.info(`Closed issue ${res.data.html_url}`)
+    } else {
+      core.info(`Issue ${res.data.html_url} is already closed`)
+    }
+  } catch (error) {
+    core.info(`Failed to get issue: ${error}`)
+  }
 }
 
 /**
