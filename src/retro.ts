@@ -64,7 +64,7 @@ export async function tryCreateRetro(client: github.GitHub, args: IRetroArgument
   const lastRetro = await findLatestRetro(client, args.teamName)
 
   if (lastRetro) {
-    core.info(`Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`)
+    core.info(`Last retro scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`)
   }
 
   // If there is already a scheduled retro in the future.

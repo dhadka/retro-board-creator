@@ -111,7 +111,7 @@ If you used project boards in the past for retros and want to start using Retrob
 Retrobot: {"date":"2020-09-30T12:00:00.000Z","team":"Team Name","driver":"alice","offset":0}
 ```
 
-being sure to set the date, team name, and driver to the appropriate values for the last retro.  The next retro will be scheduled 
+being sure to set the date, team name, and driver to the appropriate values for the last retro.
 
 ## How to contribute
 

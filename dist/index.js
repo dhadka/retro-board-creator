@@ -10150,7 +10150,7 @@ function tryCreateRetro(client, args) {
         const tomorrow = newDate(1, true);
         const lastRetro = yield api_1.findLatestRetro(client, args.teamName);
         if (lastRetro) {
-            core.info(`Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`);
+            core.info(`Last retro scheduled on ${lastRetro.date} with ${lastRetro.driver} driving`);
         }
         // If there is already a scheduled retro in the future.
         if (lastRetro && lastRetro.date > today) {
