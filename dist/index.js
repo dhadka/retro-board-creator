@@ -2632,6 +2632,371 @@ formatters.O = function (v) {
 
 /***/ }),
 
+/***/ 85:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const axios_1 = __importDefault(__webpack_require__(53));
+const mustache = __importStar(__webpack_require__(174));
+const defaults_1 = __webpack_require__(518);
+/**
+ * Prefix used in the project board description to identify projects created
+ * by this code.
+ */
+const bodyPrefix = 'Retrobot: ';
+/**
+ * Encodes an IRetroInfo object into a string that can be stored in the
+ * project board description or elsewhere.
+ *
+ * @param info the IRetroInfo object to encode
+ */
+function toProjectDescription(info) {
+    return bodyPrefix + JSON.stringify(info);
+}
+exports.toProjectDescription = toProjectDescription;
+/**
+ * Parses a string containing an encoded IRetroInfo object that was produced
+ * by {@link toProjectDescription}.
+ *
+ * @param info the string representation
+ * @returns the parsed IRetroInfo object
+ */
+function parseProjectDescription(info) {
+    if (info.startsWith(bodyPrefix)) {
+        const content = JSON.parse(info.substring(bodyPrefix.length));
+        return {
+            team: content['team'],
+            date: new Date(content['date']),
+            driver: content['driver'],
+            offset: parseInt(content['offset']),
+            issue: content['issue'] ? parseInt(content['issue']) : undefined
+        };
+    }
+    else {
+        throw Error(`not a valid retro body: ${info}`);
+    }
+}
+exports.parseProjectDescription = parseProjectDescription;
+/**
+ * Finds the last retro.
+ *
+ * @param client the GitHub client
+ * @param teamName the team name, or '' if not defined
+ * @returns information about the last retro, or undefined if no matching retro found
+ */
+function findLatestRetro(client, teamName, before) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.info('Locating the last retro...');
+        const projects = yield client.projects.listForRepo({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo
+        });
+        core.info(`Found ${projects.data.length} projects in this repo`);
+        const parseRetro = (proj) => {
+            const info = parseProjectDescription(proj.body);
+            return {
+                title: proj.name,
+                url: proj.html_url,
+                projectId: proj.id,
+                state: proj.state,
+                date: info.date,
+                team: info.team,
+                driver: info.driver,
+                offset: info.offset,
+                issue: info.issue
+            };
+        };
+        const sorted = projects.data
+            .filter(proj => proj.body.startsWith(bodyPrefix))
+            .map(proj => parseRetro(proj))
+            .filter(proj => (teamName ? teamName === proj.team : !proj.team))
+            .filter(proj => (before ? proj.date < before : true))
+            .sort((a, b) => a.date.getTime() - b.date.getTime())
+            .reverse();
+        core.info(`Found ${sorted.length} retro projects for this repo`);
+        return sorted.length > 0 ? sorted[0] : undefined;
+    });
+}
+exports.findLatestRetro = findLatestRetro;
+/**
+ * Closes the last retro board.
+ *
+ * @param client the GitHub client
+ * @param retro the retro to close
+ */
+function closeBoard(client, retro, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!onlyLog) {
+            yield client.projects.update({
+                project_id: retro.projectId,
+                state: 'closed'
+            });
+        }
+    });
+}
+exports.closeBoard = closeBoard;
+/**
+ * Creates a new project board for the retro.
+ *
+ * In addition to creating the project board and setting up the columns, this also populates the
+ * board with a few standard cards including:
+ *
+ *   1. The current retro driver
+ *   2. The next retro driver
+ *   3. A link to the previous retro
+ *
+ * These cards will be added to the last column, which should be reserved for "action items" or
+ * informational use.
+ *
+ * @param client the GitHub client
+ * @param title the title of the retro
+ * @param retroInfo information used to create and schedule the new retro
+ * @param columnNames custom column names, or [] to use the defaults
+ * @param cards formatted string describing any custom cards to populate on the board
+ * @param view the view used to render any mustache templates
+ * @param onlyLog if true, will not create the board
+ */
+function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let projectId = 0;
+        let projectUrl = '';
+        if (!onlyLog) {
+            const project = yield client.projects.createForRepo({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                name: title,
+                body: toProjectDescription(retroInfo)
+            });
+            projectId = project.data.id;
+            projectUrl = project.data.html_url;
+        }
+        if (!columnNames.length) {
+            columnNames = defaults_1.defaultColumnNames;
+        }
+        const columnMap = yield populateColumns(client, projectId, columnNames, onlyLog);
+        if (cards) {
+            yield populateCards(client, cards, view, columnMap, onlyLog);
+        }
+        return {
+            id: projectId,
+            url: projectUrl
+        };
+    });
+}
+exports.createBoard = createBoard;
+/**
+ * Updates the JSON string stored in the project board description.
+ *
+ * @param client the GitHub client
+ * @param projectId the project board id
+ * @param retroInfo the new information to store
+ * @param onlyLog if true, will not update the project board
+ */
+function updateBoardDescription(client, projectId, retroInfo, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!onlyLog) {
+            yield client.projects.update({
+                project_id: projectId,
+                body: toProjectDescription(retroInfo)
+            });
+        }
+        core.info(`Updated description of project board ${projectId}`);
+    });
+}
+exports.updateBoardDescription = updateBoardDescription;
+/**
+ * Populates the columns on the project board.
+ *
+ * @param client the GitHub client
+ * @param projectId the project board id
+ * @param columnNames the names of the columns
+ * @param onlyLog if true, will not add any columns to the board
+ */
+function populateColumns(client, projectId, columnNames, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const columnMap = {};
+        for (const name of columnNames) {
+            core.info(`Creating column '${name}'`);
+            if (!onlyLog) {
+                const column = yield client.projects.createColumn({
+                    project_id: projectId,
+                    name
+                });
+                columnMap[name] = column.data.id;
+            }
+        }
+        return columnMap;
+    });
+}
+exports.populateColumns = populateColumns;
+/**
+ * Populates any custom cards on the project board.
+ *
+ * @param client the GitHub client
+ * @param cards formatted string specifying the cards to generate
+ * @param view the view for rendering mustache templates
+ * @param columnMap map of column names to ids
+ * @param onlyLog if true, will not add any cards to the project board
+ */
+function populateCards(client, cards, view, columnMap, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!cards) {
+            core.info('No cards to render');
+            return;
+        }
+        for (const card of cards
+            .split('\n')
+            .map(c => c.trim())
+            .reverse()) {
+            const parts = card.split('=>').map(p => p.trim());
+            const text = mustache.render(parts[0], view);
+            const column = parts[1];
+            if (text) {
+                core.info(`Adding card '${text}' to column '${column}'`);
+                if (!onlyLog) {
+                    const columnId = columnMap[column];
+                    if (columnId) {
+                        yield client.projects.createCard({
+                            column_id: columnId,
+                            note: text
+                        });
+                    }
+                    else {
+                        core.info(`Card not rendered, no matching column: ${column}`);
+                    }
+                }
+            }
+            else {
+                core.info(`Card not rendered, text is empty: ${parts[0]}`);
+            }
+        }
+    });
+}
+exports.populateCards = populateCards;
+/**
+ * Creates a tracking issue for the retro driver.
+ *
+ * @param client the GitHub client
+ * @param title the issue title
+ * @param assignee the GitHub handle of the retro driver
+ * @param template the mustache template used to generate the issue text
+ * @param view view for rendering the mustache template
+ * @param onlyLog if true, will not create the tracking issue
+ */
+function createIssue(client, title, retro, template, view, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let issueNumber = 0;
+        let issueUrl = '';
+        if (!onlyLog) {
+            const issue = yield client.issues.create({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                title,
+                body: mustache.render(template, view),
+                labels: ['retrobot']
+            });
+            yield client.issues.addAssignees({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                issue_number: issue.data.number,
+                assignees: [retro.driver]
+            });
+            issueNumber = issue.data.number;
+            issueUrl = issue.data.html_url;
+        }
+        return {
+            id: issueNumber,
+            url: issueUrl
+        };
+    });
+}
+exports.createIssue = createIssue;
+/**
+ * Close the issue.
+ *
+ * @param client the GitHub client
+ * @param issueNumber the issue number to close
+ * @param onlyLog if true, will not close the issue
+ */
+function closeIssue(client, issueNumber, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const res = yield client.issues.get({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                issue_number: issueNumber
+            });
+            if (res.data.state === 'open') {
+                if (!onlyLog) {
+                    yield client.issues.update({
+                        owner: github.context.repo.owner,
+                        repo: github.context.repo.repo,
+                        issue_number: issueNumber,
+                        state: 'closed'
+                    });
+                }
+                core.info(`Closed issue ${res.data.html_url}`);
+            }
+            else {
+                core.info(`Issue ${res.data.html_url} is already closed`);
+            }
+        }
+        catch (error) {
+            core.info(`Failed to get issue: ${error}`);
+        }
+    });
+}
+exports.closeIssue = closeIssue;
+/**
+ * Sends a slack notification announcing a retro is scheduled for today.
+ *
+ * @param notificationUrl the incoming webhooks notification url
+ * @param notificationTemplate the mustache template used to generate the notification text
+ * @param view view for rendering the mustache template
+ * @param onlyLog if true, will not issue the notification
+ */
+function sendNotification(notificationUrl, notificationTemplate, view, onlyLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!onlyLog) {
+            const body = {
+                username: 'Retrobot',
+                text: mustache.render(notificationTemplate, view),
+                icon_emoji: defaults_1.defaultNotificationEmoji,
+                link_names: 1
+            };
+            const res = yield axios_1.default.post(notificationUrl, body);
+            core.info(res.statusText);
+        }
+    });
+}
+exports.sendNotification = sendNotification;
+
+
+/***/ }),
+
 /***/ 87:
 /***/ (function(module) {
 
@@ -5055,57 +5420,32 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
 const retro_1 = __webpack_require__(478);
-const defaultTitleTemplate = '{{ team }} Retro on {{{ date }}}';
-const defaultIssueTemplate = `Hey {{ driver }},
-      
-You are scheduled to drive the next retro on {{ date }}. The retro board has been created at {{{ url }}}. Please remind the team beforehand to fill out their cards.
-
-Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
-
-Best Regards,
-
-Retrobot`;
-const defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
-function getList(name, options) {
-    const value = getString(name, options);
-    if (!value)
-        return [];
-    return value.split(',').map(l => l.trim());
-}
-function getString(name, options) {
-    var _a, _b;
-    return core.getInput(name, options) || (_b = (_a = options) === null || _a === void 0 ? void 0 : _a.default, (_b !== null && _b !== void 0 ? _b : ''));
-}
-function getInt(name, options) {
-    var _a, _b, _c;
-    return _c = (_a = parseInt(core.getInput(name, options)), (_a !== null && _a !== void 0 ? _a : (_b = options) === null || _b === void 0 ? void 0 : _b.default)), (_c !== null && _c !== void 0 ? _c : NaN);
-}
-function getBoolean(name, options) {
-    return getString(name, options).toLowerCase() === 'true';
-}
+const utils_1 = __webpack_require__(611);
+const defaults_1 = __webpack_require__(518);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Starting retro creator');
         try {
+            const client = new github.GitHub(utils_1.getString('repo-token', { required: true }));
             const args = {
-                repoToken: getString('repo-token', { required: true }),
-                teamName: getString('team-name'),
-                handles: getList('handles', { required: true }),
-                retroCadenceInWeeks: getInt('retro-cadence-weeks', { default: 1 }),
-                retroDayOfWeek: getInt('retro-day-of-week', { default: 5 }),
-                titleTemplate: getString('title-template', { default: defaultTitleTemplate }),
-                notificationUrl: getString('notification-url'),
-                notificationTemplate: getString('notification-template', { default: defaultNotificationTemplate }),
-                closeAfterDays: getInt('close-after-days', { default: 0 }),
-                createTrackingIssue: getBoolean('create-tracking-issue'),
-                issueTemplate: getString('issue-template', { default: defaultIssueTemplate }),
-                columns: getList('columns'),
-                cards: getString('cards'),
-                onlyLog: getBoolean('only-log')
+                teamName: utils_1.getString('team-name'),
+                handles: utils_1.getList('handles', { required: true }),
+                retroCadenceInWeeks: utils_1.getInt('retro-cadence-weeks', { default: 1 }),
+                retroDayOfWeek: utils_1.getInt('retro-day-of-week', { default: 5 }),
+                titleTemplate: utils_1.getString('title-template', { default: defaults_1.defaultTitleTemplate }),
+                notificationUrl: utils_1.getString('notification-url'),
+                notificationTemplate: utils_1.getString('notification-template', { default: defaults_1.defaultNotificationTemplate }),
+                closeAfterDays: utils_1.getInt('close-after-days', { default: 0 }),
+                createTrackingIssue: utils_1.getBoolean('create-tracking-issue'),
+                issueTemplate: utils_1.getString('issue-template', { default: defaults_1.defaultIssueTemplate }),
+                columns: utils_1.getList('columns'),
+                cards: utils_1.getString('cards'),
+                onlyLog: utils_1.getBoolean('only-log')
             };
             core.info('Arguments parsed. Starting creation.');
-            yield retro_1.tryCreateRetro(args);
+            yield retro_1.tryCreateRetro(client, args);
         }
         catch (error) {
             core.setFailed(error.message);
@@ -9759,14 +10099,10 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
-const github = __importStar(__webpack_require__(469));
-const axios_1 = __importDefault(__webpack_require__(53));
 const mustache = __importStar(__webpack_require__(174));
+const api_1 = __webpack_require__(85);
 /**
  * Performs all the functionality to create the retros, including:
  *
@@ -9789,7 +10125,7 @@ const mustache = __importStar(__webpack_require__(174));
  * to run every day at 10 AM EST, which is when any notifications will be sent.  If the
  * workflow is scheduled multiple times a day, multiple notifications may be sent.
  */
-function tryCreateRetro(args) {
+function tryCreateRetro(client, args) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!args.handles.length) {
             throw Error('requires at least one handle');
@@ -9797,10 +10133,22 @@ function tryCreateRetro(args) {
         if (args.onlyLog) {
             core.info('only-log is set, will not make any changes');
         }
-        const client = new github.GitHub(args.repoToken);
+        // Close any outdated retros.
+        if (args.closeAfterDays > 0) {
+            const oldRetro = yield api_1.findLatestRetro(client, args.teamName, newDate(-args.closeAfterDays));
+            if (oldRetro && oldRetro.state === 'open') {
+                yield api_1.closeBoard(client, oldRetro, args.onlyLog);
+                core.info(`Closed old project board from ${oldRetro.date}`);
+                if (oldRetro.issue) {
+                    yield api_1.closeIssue(client, oldRetro.issue, args.onlyLog);
+                    core.info(`Closed old issue referenced by project board`);
+                }
+            }
+        }
+        // Locate the last retro.
         const today = newDate(0, true);
         const tomorrow = newDate(1, true);
-        const lastRetro = yield findLatestRetro(client, args.teamName);
+        const lastRetro = yield api_1.findLatestRetro(client, args.teamName);
         if (lastRetro) {
             core.info(`Last retro occurred on ${lastRetro.date} with ${lastRetro.driver} driving`);
         }
@@ -9808,7 +10156,7 @@ function tryCreateRetro(args) {
         if (lastRetro && lastRetro.date > today) {
             if (lastRetro.date < tomorrow) {
                 core.info('Retro happening today, sending notification');
-                yield sendNotification(args.notificationUrl, args.notificationTemplate, lastRetro, args.onlyLog);
+                yield api_1.sendNotification(args.notificationUrl, args.notificationTemplate, lastRetro, args.onlyLog);
             }
             return;
         }
@@ -9821,7 +10169,7 @@ function tryCreateRetro(args) {
         const futureRetroDriver = nextDriver(args.handles, nextRetroDriver);
         core.info(`Next retro scheduled for ${nextRetroDate} with ${nextRetroDriver} driving`);
         // Create the new retro and issue.
-        const newRetro = {
+        let newRetro = {
             date: nextRetroDate,
             team: args.teamName,
             driver: nextRetroDriver,
@@ -9831,26 +10179,14 @@ function tryCreateRetro(args) {
         const view = createView(newRetro, lastRetro, futureRetroDriver);
         const title = createTitle(args.titleTemplate, view);
         view['title'] = title;
-        const board = yield createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog);
+        const board = yield api_1.createBoard(client, title, newRetro, args.columns, args.cards, view, args.onlyLog);
         view['url'] = board.url;
         core.info(`Created retro board at ${board.url}`);
         if (args.createTrackingIssue) {
-            const issue = yield createIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog);
+            const issue = yield api_1.createIssue(client, title, newRetro, args.issueTemplate, view, args.onlyLog);
             core.info(`Created tracking issue at ${issue.url}`);
-            newRetro.issue = issue.id;
-            yield updateBoardDescription(client, board.id, newRetro, args.onlyLog);
-        }
-        // Close the last retro and issue.
-        if (lastRetro &&
-            lastRetro.state === 'open' &&
-            args.closeAfterDays > 0 &&
-            lastRetro.date < newDate(-args.closeAfterDays)) {
-            yield closeBoard(client, lastRetro, args.onlyLog);
-            core.info(`Closed old project board from ${lastRetro.date}`);
-            if (lastRetro.issue) {
-                yield closeIssue(client, lastRetro.issue, args.onlyLog);
-                core.info(`Closed old issue referenced by project board`);
-            }
+            newRetro = Object.assign({}, newRetro, { issue: issue.id });
+            yield api_1.updateBoardDescription(client, board.id, newRetro, args.onlyLog);
         }
     });
 }
@@ -9878,81 +10214,6 @@ function nextDriver(handles, lastDriver, lastOffset = 0) {
 }
 exports.nextDriver = nextDriver;
 /**
- * Prefix used in the project board description to identify projects created
- * by this code.
- */
-const bodyPrefix = 'Retrobot: ';
-/**
- * Encodes an IRetroInfo object into a string that can be stored in the
- * project board description or elsewhere.
- *
- * @param info the IRetroInfo object to encode
- */
-function toProjectDescription(info) {
-    return bodyPrefix + JSON.stringify(info);
-}
-/**
- * Parses a string containing an encoded IRetroInfo object that was produced
- * by {@link toProjectDescription}.
- *
- * @param info the string representation
- * @returns the parsed IRetroInfo object
- */
-function parseProjectDescription(info) {
-    if (info.startsWith(bodyPrefix)) {
-        const content = JSON.parse(info.substring(bodyPrefix.length));
-        return {
-            team: content['team'],
-            date: new Date(content['date']),
-            driver: content['driver'],
-            offset: parseInt(content['offset']),
-            issue: content['issue'] ? parseInt(content['issue']) : undefined
-        };
-    }
-    else {
-        throw Error(`not a valid retro body: ${info}`);
-    }
-}
-/**
- * Finds the last retro.
- *
- * @param client the GitHub client
- * @param teamName the team name, or '' if not defined
- * @returns information about the last retro, or undefined if no matching retro found
- */
-function findLatestRetro(client, teamName) {
-    return __awaiter(this, void 0, void 0, function* () {
-        core.info('Locating the last retro...');
-        const projects = yield client.projects.listForRepo({
-            owner: github.context.repo.owner,
-            repo: github.context.repo.repo
-        });
-        core.info(`Found ${projects.data.length} projects in this repo`);
-        const parseRetro = (proj) => {
-            const info = parseProjectDescription(proj.body);
-            return {
-                title: proj.name,
-                url: proj.html_url,
-                projectId: proj.id,
-                state: proj.state,
-                date: info.date,
-                team: info.team,
-                driver: info.driver,
-                offset: info.offset,
-                issue: info.issue
-            };
-        };
-        const sorted = projects.data
-            .filter(proj => proj.body.startsWith(bodyPrefix))
-            .map(proj => parseRetro(proj))
-            .filter(proj => (teamName ? teamName === proj.team : !proj.team))
-            .sort((a, b) => a.date.getTime() - b.date.getTime())
-            .reverse();
-        core.info(`Found ${sorted.length} retro projects for this repo`);
-        return sorted.length > 0 ? sorted[0] : undefined;
-    });
-}
-/**
  * Creates a new date object.
  *
  * @param offsetDays when set, specifies the number of days to offset from today
@@ -9966,6 +10227,7 @@ function newDate(offsetDays = 0, atMidnight = false) {
     }
     return date;
 }
+exports.newDate = newDate;
 /**
  * Returns the date of the next retro.
  *
@@ -10010,81 +10272,6 @@ function createTitle(template, view) {
     return result;
 }
 /**
- * Closes the last retro board.
- *
- * @param client the GitHub client
- * @param retro the retro to close
- */
-function closeBoard(client, retro, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!onlyLog) {
-            yield client.projects.update({
-                project_id: retro.projectId,
-                state: 'closed'
-            });
-        }
-    });
-}
-/**
- * Creates a new project board for the retro.
- *
- * In addition to creating the project board and setting up the columns, this also populates the
- * board with a few standard cards including:
- *
- *   1. The current retro driver
- *   2. The next retro driver
- *   3. A link to the previous retro
- *
- * These cards will be added to the last column, which should be reserved for "action items" or
- * informational use.
- *
- * @param client the GitHub client
- * @param title the title of the retro
- * @param retroInfo information used to create and schedule the new retro
- * @param columnNames custom column names, or [] to use the defaults
- * @param cards formatted string describing any custom cards to populate on the board
- * @param view the view used to render any mustache templates
- * @param onlyLog if true, will not create the board
- */
-function createBoard(client, title, retroInfo, columnNames, cards, view, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let projectId = 0;
-        let projectUrl = '';
-        if (!onlyLog) {
-            const project = yield client.projects.createForRepo({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
-                name: title,
-                body: toProjectDescription(retroInfo)
-            });
-            projectId = project.data.id;
-            projectUrl = project.data.html_url;
-        }
-        if (!columnNames.length) {
-            columnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
-        }
-        const columnMap = yield populateColumns(client, projectId, columnNames, onlyLog);
-        if (cards) {
-            yield populateCards(client, cards, view, columnMap, onlyLog);
-        }
-        return {
-            id: projectId,
-            url: projectUrl
-        };
-    });
-}
-function updateBoardDescription(client, projectId, retroInfo, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!onlyLog) {
-            yield client.projects.update({
-                project_id: projectId,
-                body: toProjectDescription(retroInfo)
-            });
-        }
-        core.info(`Updated description of project board ${projectId}`);
-    });
-}
-/**
  * Generates a view object used to render the Mustache templates.
  *
  * @param retroInfo the current retro info
@@ -10108,167 +10295,6 @@ function createView(retroInfo, lastRetro, futureDriver) {
         };
     }
     return view;
-}
-/**
- * Populates the columns on the project board.
- *
- * @param client the GitHub client
- * @param projectId the project board id
- * @param columnNames the names of the columns
- * @param onlyLog if true, will not add any columns to the board
- */
-function populateColumns(client, projectId, columnNames, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const columnMap = {};
-        for (const name of columnNames) {
-            core.info(`Creating column '${name}'`);
-            if (!onlyLog) {
-                const column = yield client.projects.createColumn({
-                    project_id: projectId,
-                    name
-                });
-                columnMap[name] = column.data.id;
-            }
-        }
-        return columnMap;
-    });
-}
-/**
- * Populates any custom cards on the project board.
- *
- * @param client the GitHub client
- * @param cards formatted string specifying the cards to generate
- * @param view the view for rendering mustache templates
- * @param columnMap map of column names to ids
- * @param onlyLog if true, will not add any cards to the project board
- */
-function populateCards(client, cards, view, columnMap, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!cards) {
-            core.info('No cards to render');
-            return;
-        }
-        for (const card of cards
-            .split('\n')
-            .map(c => c.trim())
-            .reverse()) {
-            const parts = card.split('=>').map(p => p.trim());
-            const text = mustache.render(parts[0], view);
-            const column = parts[1];
-            if (text) {
-                core.info(`Adding card '${text}' to column '${column}'`);
-                if (!onlyLog) {
-                    const columnId = columnMap[column];
-                    if (columnId) {
-                        yield client.projects.createCard({
-                            column_id: columnId,
-                            note: text
-                        });
-                    }
-                    else {
-                        core.info(`Card not rendered, no matching column: ${column}`);
-                    }
-                }
-            }
-            else {
-                core.info(`Card not rendered, text is empty: ${parts[0]}`);
-            }
-        }
-    });
-}
-/**
- * Creates a tracking issue for the retro driver.
- *
- * @param client the GitHub client
- * @param title the issue title
- * @param assignee the GitHub handle of the retro driver
- * @param template the mustache template used to generate the issue text
- * @param view view for rendering the mustache template
- * @param onlyLog if true, will not create the tracking issue
- */
-function createIssue(client, title, retro, template, view, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let issueNumber = 0;
-        let issueUrl = '';
-        if (!onlyLog) {
-            const issue = yield client.issues.create({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
-                title,
-                body: mustache.render(template, view),
-                labels: ['retrobot']
-            });
-            yield client.issues.addAssignees({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
-                issue_number: issue.data.number,
-                assignees: [retro.driver]
-            });
-            issueNumber = issue.data.number;
-            issueUrl = issue.data.html_url;
-        }
-        return {
-            id: issueNumber,
-            url: issueUrl
-        };
-    });
-}
-/**
- * Close the issue.
- *
- * @param client the GitHub client
- * @param issueNumber the issue number to close
- * @param onlyLog if true, will not close the issue
- */
-function closeIssue(client, issueNumber, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const res = yield client.issues.get({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
-                issue_number: issueNumber
-            });
-            if (res.data.state === 'open') {
-                if (!onlyLog) {
-                    yield client.issues.update({
-                        owner: github.context.repo.owner,
-                        repo: github.context.repo.repo,
-                        issue_number: issueNumber,
-                        state: 'closed'
-                    });
-                }
-                core.info(`Closed issue ${res.data.html_url}`);
-            }
-            else {
-                core.info(`Issue ${res.data.html_url} is already closed`);
-            }
-        }
-        catch (error) {
-            core.info(`Failed to get issue: ${error}`);
-        }
-    });
-}
-/**
- * Sends a slack notification announcing a retro is scheduled for today.
- *
- * @param notificationUrl the incoming webhooks notification url
- * @param notificationTemplate the mustache template used to generate the notification text
- * @param view view for rendering the mustache template
- * @param onlyLog if true, will not issue the notification
- */
-function sendNotification(notificationUrl, notificationTemplate, view, onlyLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!onlyLog) {
-            const body = {
-                username: 'Retrobot',
-                text: mustache.render(notificationTemplate, view),
-                icon_emoji: ':rocket:',
-                link_names: 1
-            };
-            const res = yield axios_1.default.post(notificationUrl, body);
-            core.info(res.statusText);
-        }
-    });
 }
 
 
@@ -10714,6 +10740,29 @@ function addHook (state, kind, name, hook) {
     orig: orig
   })
 }
+
+
+/***/ }),
+
+/***/ 518:
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.defaultTitleTemplate = '{{{ team }}} Retro on {{{ date }}}';
+exports.defaultIssueTemplate = `Hey {{ driver }},
+      
+You are scheduled to drive the next retro on {{ date }}. The retro board has been created at {{{ url }}}. Please remind the team beforehand to fill out their cards.
+
+Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
+
+Best Regards,
+
+Retrobot`;
+exports.defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
+exports.defaultNotificationEmoji = ':rocket:';
+exports.defaultColumnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
 
 
 /***/ }),
@@ -12194,6 +12243,49 @@ module.exports = function isAbsoluteURL(url) {
 /***/ (function(module) {
 
 module.exports = require("http");
+
+/***/ }),
+
+/***/ 611:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+function getList(name, options) {
+    const value = getString(name, options);
+    if (!value)
+        return [];
+    return value.split(',').map(l => l.trim());
+}
+exports.getList = getList;
+function getString(name, options) {
+    var _a, _b;
+    return core.getInput(name, options) || (_b = (_a = options) === null || _a === void 0 ? void 0 : _a.default, (_b !== null && _b !== void 0 ? _b : ''));
+}
+exports.getString = getString;
+function getInt(name, options) {
+    var _a, _b;
+    const value = parseInt(core.getInput(name, options));
+    if (isNaN(value)) {
+        return _b = (_a = options) === null || _a === void 0 ? void 0 : _a.default, (_b !== null && _b !== void 0 ? _b : NaN);
+    }
+    return value;
+}
+exports.getInt = getInt;
+function getBoolean(name, options) {
+    return getString(name, options).toLowerCase() === 'true';
+}
+exports.getBoolean = getBoolean;
+
 
 /***/ }),
 

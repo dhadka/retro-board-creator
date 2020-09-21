@@ -103,6 +103,16 @@ Modify the `retro-cadence-weeks` and/or `retro-day-of-week` settings in the Acti
 
 The retro driver order can be changed at any time by editing the `handles` setting.  You can also add or remove handles at any time.  However, this will not change any existing retro project boards.  If you need update the driver for the existing retro, it is a good idea to change both the `driver` name in the JSON as well as update the `handles` in the workflow file to ensure the order of future retro drivers is unchanged.
 
+### Bootstrapping schedule
+
+If you used project boards in the past for retros and want to start using Retrobot, you can bootstrap the schedule by editing the last retro and putting the following in the description:
+
+```
+Retrobot: {"date":"2020-09-30T12:00:00.000Z","team":"Team Name","driver":"alice","offset":0}
+```
+
+being sure to set the date, team name, and driver to the appropriate values for the last retro.  The next retro will be scheduled 
+
 ## How to contribute
 
 Install the dependencies  

@@ -34,6 +34,8 @@
   },
   "devDependencies": {
     "@types/jest": "^24.0.23",
+    "@types/mockdate": "^2.0.0",
+    "@types/nock": "^11.1.0",
     "@types/node": "^12.7.12",
     "@typescript-eslint/parser": "^2.8.0",
     "@zeit/ncc": "^0.20.5",
@@ -43,6 +45,8 @@
     "jest": "^24.9.0",
     "jest-circus": "^24.9.0",
     "js-yaml": "^3.13.1",
+    "mockdate": "^3.0.2",
+    "nock": "^13.0.4",
     "prettier": "^1.19.1",
     "ts-jest": "^24.2.0",
     "typescript": "^3.6.4"
