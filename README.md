@@ -55,7 +55,7 @@ jobs:
         retro-cadence-weeks: 2  # Bi-weekly
         retro-day-of-week: 3    # Wednesday
         close-after-days: 7
-        notificationUrl: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
+        notification-url: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
         create-tracking-issue: true
         columns: Shoutouts, What went well, What could be better, Action items!
         cards: |
