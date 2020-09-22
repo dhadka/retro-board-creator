@@ -2,6 +2,8 @@
 
 Retrobot automates the creation of retrospective boards on GitHub.  In addition to creating the board, it can also create a tracking issue assigned to the retro driver and send a Slack notification the day of the retro.
 
+See [Retrobot's project boards](https://github.com/dhadka/retrobot/projects) for an example.
+
 ## Development history
 
 Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/hross/retro-board-creator), with the following additions:
@@ -18,7 +20,7 @@ Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/
 ### Minimal example
 
 ```
-name: Create retro board
+name: Create retro board every Friday
 
 on:
   schedule:
