@@ -37,6 +37,8 @@ jobs:
 
 ### Advanced example
 
+Schedules a bi-weekly retro on Wednesday.  Demonstrates customizing the columns and cards of the retro board, creating an issue, and sending notifications.  When using these advanced features, you should schedule the workflow to run daily, before the scheduled time of the retro, so Retrobot can send notifications at an appropriate time.
+
 ```
 name: Create retro board
 
@@ -52,8 +54,8 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         team-name: My Team
         handles: alice,bob,charlie,denise,erica
-        retro-cadence-weeks: 2  # Bi-weekly
-        retro-day-of-week: 3    # Wednesday
+        retro-cadence-weeks: 2
+        retro-day-of-week: 3
         close-after-days: 7
         notification-url: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
         create-tracking-issue: true
@@ -67,37 +69,20 @@ jobs:
 
 ## Custom options
 
-**`team-name`** - Team name to include in the retro title and announcements. This is useful if multiple teams are using retrobot within the same repo.
-
-**`retro-cadence-weeks`** - The frequency of retros, in weeks.  The default is `1`.
-
-**`retro-day-of-week`** - The day of the week to hold the retro. `0` is Sunday, `1` is Monday, and so on.  The default is `5` (Friday).
-
-**`title-template`** - Template used to generate the retro title.
-
-**`notification-url`** - Slack incoming webhooks url to send a notification the day of the retro.  This requires the Action schedule trigger to be configured to run a few hours before the start of the retro.
-
-**`notification-template`** - Template used to generate the notification text.
-
-**`close-after-days`** - When set, the previous retro board will be automatically closed after the given number of days.
-
-**`create-tracking-issue`** - If `true`, will create a tracking issue for the upcoming retro and assign it to the driver.  Default is `false`.
-
-**`issue-template`** - Template used to generate the body of the issue.
-
-**`columns`** - Comma separated list of column names. If not specified, defaults to `"Went well", "Went meh", "Could have gone better", Action items!"`.
-
-**`cards`** - Custom cards added to the project board.  This is input as a multiline string, where each line represents a card.  The format of a card is `<note> => <column_name>`.  For example:
-
-```
-with:
-  cards: |
-    Current retro driver: {{ driver }} => Action items!
-    Next retro driver: {{ next-driver }} => Action items!
-    {{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }} => Action items!
-```
-
-**`only-log`** - Log what actions would be performed, but do not actually create the retro board, issue, or notifications.  Useful for testing.
+| Option        | Description    |
+|---------------|----------------|
+| `team-name`   | Team name to include in the retro title and announcements. This is useful if multiple teams are using retrobot within the same repo. |
+| `retro-cadence-weeks` | The frequency of retros, in weeks.  The default is `1`. |
+| `retro-day-of-week`   | The day of the week to hold the retro. `0` is Sunday, `1` is Monday, and so on.  The default is `5` (Friday). |
+| `title-template`      | Template used to generate the retro title. |
+| `notification-url`    | Slack incoming webhooks url to send a notification the day of the retro.  This requires the Action schedule trigger to be configured to run a few hours before the start of the retro. |
+| `notification-template` |  Template used to generate the notification text. |
+| `close-after-days`      | When set, the previous retro board will be automatically closed after the given number of days. |
+| `create-tracking-issue` | If `true`, will create a tracking issue for the upcoming retro and assign it to the driver.  Default is `false`. |
+| `issue-template`        | Template used to generate the body of the issue. |
+| `columns`               | Comma separated list of column names. If not specified, defaults to `"Went well", "Went meh", "Could have gone better", Action items!"`. |
+| `cards`                 | Custom cards added to the project board.  This is input as a multiline string, where each line represents a card.  The format of a card is `<note> => <column_name>`.  See the [advanced example](#advanced-example) for a sample. |
+| `only-log` | Log what actions would be performed, but do not actually create the retro board, issue, or notifications.  Useful for testing. |
 
 ## Template rendering
 
