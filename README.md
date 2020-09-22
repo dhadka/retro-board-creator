@@ -56,9 +56,9 @@ jobs:
         handles: alice,bob,charlie,denise,erica
         retro-cadence-weeks: 2
         retro-day-of-week: 3
-        close-after-days: 7
-        notification-url: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
         create-tracking-issue: true
+        notification-url: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
+        close-after-days: 7
         columns: Shoutouts, What went well, What could be better, Action items!
         cards: |
           Retrobot is now creating retros! => Shoutouts
