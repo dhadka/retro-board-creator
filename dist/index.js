@@ -2705,6 +2705,7 @@ exports.parseProjectDescription = parseProjectDescription;
  *
  * @param client the GitHub client
  * @param teamName the team name, or '' if not defined
+ * @param before if specified, finds the last retro before the given date
  * @returns information about the last retro, or undefined if no matching retro found
  */
 function findLatestRetro(client, teamName, before) {

@@ -323,6 +323,23 @@ describe('test findLatestRetro', () => {
     scope.done()
   })
 
+  test('retrobot project with no team matches no team', async () => {
+    const date1 = new Date('2020-09-19')
+    const date2 = new Date('2020-09-20')
+
+    const scope = nock('https://api.github.com')
+      .get(`/repos/my-org/my-repo/projects`)
+      .reply(200, [
+        createProjectJson(1, 'my-project', 'Retrobot: {"team":""}', date1),
+        createProjectJson(2, 'my-project', 'Retrobot: {"team":"Test Team"}', date2)
+      ])
+
+    const result = await findLatestRetro(client, '')
+    expect(result).toBeDefined()
+    expect(result?.projectId).toBe(1)
+    scope.done()
+  })
+
   test('pick most recent project', async () => {
     const date1 = new Date('2020-09-19')
     const date2 = new Date('2020-09-20')

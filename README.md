@@ -13,10 +13,12 @@ Retrobot is based heavily off of [hross/retro-board-creator](https://github.com/
 5. Option to close prior retro boards.
 6. Everything is customizable via mustache templates with `{{ variable }}` rendering
 
-## Example workflow
+## Example workflows
+
+### Minimal example
 
 ```
-name: Create the Retrospective Board
+name: Create retro board
 
 on:
   schedule:
@@ -31,11 +33,41 @@ jobs:
         handles: alice,bob,charlie,denise,erica
 ```
 
+### Advanced example
+
+```
+name: Create retro board
+
+on:
+  schedule:
+    - cron: '0 14 * * *'
+
+jobs:
+  create-board:
+    steps:
+    - uses: dhadka/retrobot@master
+      with: 
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        team-name: My Team
+        handles: alice,bob,charlie,denise,erica
+        retro-cadence-weeks: 2  # Bi-weekly
+        retro-day-of-week: 3    # Wednesday
+        close-after-days: 7
+        notificationUrl: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
+        create-tracking-issue: true
+        columns: Shoutouts, What went well, What could be better, Action items!
+        cards: |
+          Retrobot is now creating retros! => Shoutouts
+          Today's retro driver: {{ driver }} => Action items!
+          Next retro driver: {{ next-driver }} => Action items!
+          {{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }} => Action items!
+```
+
 ## Custom options
 
 **`team-name`** - Team name to include in the retro title and announcements. This is useful if multiple teams are using retrobot within the same repo.
 
-**`retro-cadence-weeks`** - The frequency of retros, in weeks.  The default is weekly, `2` is bi-weekly, and so on.
+**`retro-cadence-weeks`** - The frequency of retros, in weeks.  The default is `1`.
 
 **`retro-day-of-week`** - The day of the week to hold the retro. `0` is Sunday, `1` is Monday, and so on.  The default is `5` (Friday).
 
@@ -83,7 +115,7 @@ In addition, if a previous retro is found, the `last-retro` variable will be set
 * `driver` - The GitHub handle of the previous retro driver
 * `url` - The url to the previous retro's project board
 
-You can reference these variables using `{{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }}`.  If `last-retro` does not exist, the entire contents of the string will not be rendered.
+You can reference these variables using, for example, `{{ #last-retro }}Last retro: {{{ url }}}{{ /last-retro }}`.  If `last-retro` does not exist, the entire contents of the string will not be rendered (and as a result the card will not be created).
 
 **Note: Mustache automatically escapes strings for HTML. Disable escaping by using three brackets `{{{ ... }}}`.  This is recommended for urls and dates.**
 
