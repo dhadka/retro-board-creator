@@ -2,7 +2,7 @@ import * as core from '@actions/core'
 import * as github from '@actions/github'
 import {IRetroArguments} from './types'
 import {tryCreateRetro} from './retro'
-import {getList, getBoolean, getString, getInt} from './utils'
+import {getList, getBoolean, getString, getInt, parseDayOfWeek} from './utils'
 import {defaultTitleTemplate, defaultNotificationTemplate, defaultIssueTemplate} from './defaults'
 
 async function run(): Promise<void> {
@@ -15,7 +15,7 @@ async function run(): Promise<void> {
       teamName: getString('team-name'),
       handles: getList('handles', {required: true}),
       retroCadenceInWeeks: getInt('retro-cadence-weeks', {default: 1}),
-      retroDayOfWeek: getInt('retro-day-of-week', {default: 5}),
+      retroDayOfWeek: parseDayOfWeek(getString('retro-day-of-week', {default: 'friday'})),
       titleTemplate: getString('title-template', {default: defaultTitleTemplate}),
       notificationUrl: getString('notification-url'),
       notificationTemplate: getString('notification-template', {default: defaultNotificationTemplate}),

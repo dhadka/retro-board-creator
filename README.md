@@ -55,7 +55,7 @@ jobs:
         team-name: My Team
         handles: alice,bob,charlie,denise,erica
         retro-cadence-weeks: 2
-        retro-day-of-week: 3
+        retro-day-of-week: wednesday
         create-tracking-issue: true
         notification-url: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
         close-after-days: 7
@@ -73,7 +73,7 @@ jobs:
 |---------------|----------------|
 | `team-name`   | Team name to include in the retro title and announcements. This is useful if multiple teams are using retrobot within the same repo. |
 | `retro-cadence-weeks` | The frequency of retros, in weeks.  The default is `1`. |
-| `retro-day-of-week`   | The day of the week to hold the retro. `0` is Sunday, `1` is Monday, and so on.  The default is `5` (Friday). |
+| `retro-day-of-week`   | The day of the week to hold the retro. The default is `friday`. |
 | `title-template`      | Template used to generate the retro title. |
 | `notification-url`    | Slack incoming webhooks url to send a notification the day of the retro.  This requires the Action schedule trigger to be configured to run a few hours before the start of the retro. |
 | `notification-template` |  Template used to generate the notification text. |

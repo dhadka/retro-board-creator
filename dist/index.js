@@ -5434,7 +5434,7 @@ function run() {
                 teamName: utils_1.getString('team-name'),
                 handles: utils_1.getList('handles', { required: true }),
                 retroCadenceInWeeks: utils_1.getInt('retro-cadence-weeks', { default: 1 }),
-                retroDayOfWeek: utils_1.getInt('retro-day-of-week', { default: 5 }),
+                retroDayOfWeek: utils_1.parseDayOfWeek(utils_1.getString('retro-day-of-week', { default: 'friday' })),
                 titleTemplate: utils_1.getString('title-template', { default: defaults_1.defaultTitleTemplate }),
                 notificationUrl: utils_1.getString('notification-url'),
                 notificationTemplate: utils_1.getString('notification-template', { default: defaults_1.defaultNotificationTemplate }),
@@ -12286,6 +12286,44 @@ function getBoolean(name, options) {
     return getString(name, options).toLowerCase() === 'true';
 }
 exports.getBoolean = getBoolean;
+function parseDayOfWeek(value) {
+    const days = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+    ];
+    value = value.trim().toLowerCase();
+    if (value === '') {
+        throw Error('invalid day of week: value is empty');
+    }
+    else if (value.match(/^\d+$/)) {
+        const intValue = parseInt(value);
+        if (intValue < 0 || intValue >= 7) {
+            throw Error(`invalid day of week: '${value}' is not a valid day of week number, expect 0-6`);
+        }
+        return intValue;
+    }
+    else {
+        let index = -1;
+        for (const day of days) {
+            if (day.startsWith(value)) {
+                if (index >= 0) {
+                    throw Error(`invalid day of week: matches both ${days[index]} and ${day}`);
+                }
+                index = days.indexOf(day);
+            }
+        }
+        if (index < 0) {
+            throw Error(`invalid day of week: '${value}' must match one of ${days.join(', ')}`);
+        }
+        return index;
+    }
+}
+exports.parseDayOfWeek = parseDayOfWeek;
 
 
 /***/ }),

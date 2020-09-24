@@ -1,4 +1,4 @@
-import {getString, getInt, getBoolean, getList} from '../src/utils'
+import {getString, getInt, getBoolean, getList, parseDayOfWeek} from '../src/utils'
 
 function getInputName(name: string): string {
   return `INPUT_${name.replace(/ /g, '_').toUpperCase()}`
@@ -72,4 +72,39 @@ test('test getList', async () => {
 
   setInput(name, ' foo  , bar ')
   expect(getList(name)).toStrictEqual(['foo', 'bar'])
+})
+
+test('test parseDayOfWeek', async () => {
+  expect(() => parseDayOfWeek('')).toThrowError()
+  expect(() => parseDayOfWeek('   ')).toThrowError()
+
+  expect(() => parseDayOfWeek('-1')).toThrowError()
+  expect(() => parseDayOfWeek('7')).toThrowError()
+
+  expect(parseDayOfWeek('0')).toBe(0)
+  expect(parseDayOfWeek('1')).toBe(1)
+  expect(parseDayOfWeek('2')).toBe(2)
+  expect(parseDayOfWeek('3')).toBe(3)
+  expect(parseDayOfWeek('4')).toBe(4)
+  expect(parseDayOfWeek('5')).toBe(5)
+  expect(parseDayOfWeek('6')).toBe(6)
+
+  expect(parseDayOfWeek(' 1 ')).toBe(1)
+
+  expect(parseDayOfWeek('sunday')).toBe(0)
+  expect(parseDayOfWeek('monday')).toBe(1)
+  expect(parseDayOfWeek('tuesday')).toBe(2)
+  expect(parseDayOfWeek('wednesday')).toBe(3)
+  expect(parseDayOfWeek('thursday')).toBe(4)
+  expect(parseDayOfWeek('friday')).toBe(5)
+  expect(parseDayOfWeek('saturday')).toBe(6)
+
+  expect(parseDayOfWeek(' friday ')).toBe(5)
+  expect(parseDayOfWeek('FRIDAY')).toBe(5)
+  expect(parseDayOfWeek('fri')).toBe(5)
+
+  expect(parseDayOfWeek('tu')).toBe(2)
+  expect(parseDayOfWeek('th')).toBe(4)
+  expect(() => parseDayOfWeek('t')).toThrowError()
+  expect(() => parseDayOfWeek('foo')).toThrowError()
 })

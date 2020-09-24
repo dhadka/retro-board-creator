@@ -15,7 +15,7 @@ jobs:
         team-name: My Team
         handles: dhadka
         retro-cadence-weeks: 2
-        retro-day-of-week: 3
+        retro-day-of-week: wednesday
         close-after-days: 7
         create-tracking-issue: true
         columns: Shoutouts, What went well, What could be better, Action items!
