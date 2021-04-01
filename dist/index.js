@@ -2646,6 +2646,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -2709,14 +2716,9 @@ exports.parseProjectDescription = parseProjectDescription;
  * @returns information about the last retro, or undefined if no matching retro found
  */
 function findLatestRetro(client, teamName, before) {
+    var e_1, _a;
     return __awaiter(this, void 0, void 0, function* () {
         core.info('Locating the last retro...');
-        const projects = yield client.projects.listForRepo({
-            owner: github.context.repo.owner,
-            repo: github.context.repo.repo,
-            state: "all"
-        });
-        core.info(`Found ${projects.data.length} projects in this repo`);
         const parseRetro = (proj) => {
             const info = parseProjectDescription(proj.body);
             return {
@@ -2731,11 +2733,37 @@ function findLatestRetro(client, teamName, before) {
                 issue: info.issue
             };
         };
-        const sorted = projects.data
-            .filter(proj => proj.body.startsWith(bodyPrefix))
-            .map(proj => parseRetro(proj))
-            .filter(proj => (teamName ? teamName === proj.team : !proj.team))
-            .filter(proj => (before ? proj.date < before : true))
+        const retros = [];
+        try {
+            for (var _b = __asyncValues(client.paginate.iterator(client.projects.listForRepo.endpoint.merge({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                state: "all"
+            }))), _c; _c = yield _b.next(), !_c.done;) {
+                const result = _c.value;
+                const response = result.data;
+                if (response) {
+                    core.info(`Loading page containing ${response.length} projects`);
+                    response
+                        .filter(proj => proj.body.startsWith(bodyPrefix))
+                        .map(proj => parseRetro(proj))
+                        .forEach(retro => retros.push(retro));
+                }
+                else {
+                    core.error(`Unexpected response: ${response}`);
+                }
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (_c && !_c.done && (_a = _b.return)) yield _a.call(_b);
+            }
+            finally { if (e_1) throw e_1.error; }
+        }
+        const sorted = retros
+            .filter(retro => (teamName ? teamName === retro.team : !retro.team))
+            .filter(retro => (before ? retro.date < before : true))
             .sort((a, b) => a.date.getTime() - b.date.getTime())
             .reverse();
         core.info(`Found ${sorted.length} retro projects for this repo`);
