@@ -85,9 +85,7 @@ export async function findLatestRetro(
   }
 
   projects.data.forEach(proj => {
-    const info = parseProjectDescription(proj.body)
-
-    core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`)
+    core.info(`> ${proj.name} ${proj.state} ${proj.body}`)
   })
 
   const sorted = projects.data

@@ -2732,8 +2732,7 @@ function findLatestRetro(client, teamName, before) {
             };
         };
         projects.data.forEach(proj => {
-            const info = parseProjectDescription(proj.body);
-            core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`);
+            core.info(`> ${proj.name} ${proj.state} ${proj.body}`);
         });
         const sorted = projects.data
             .filter(proj => proj.body.startsWith(bodyPrefix))
