@@ -71,8 +71,6 @@ export async function findLatestRetro(
   const parseRetro = (proj: Octokit.ProjectsListForRepoResponseItem): IRetro => {
     const info = parseProjectDescription(proj.body)
 
-    core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`)
-
     return {
       title: proj.name,
       url: proj.html_url,
@@ -85,6 +83,12 @@ export async function findLatestRetro(
       issue: info.issue
     }
   }
+
+  projects.data.forEach(proj => {
+    const info = parseProjectDescription(proj.body)
+
+    core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`)
+  })
 
   const sorted = projects.data
     .filter(proj => proj.body.startsWith(bodyPrefix))

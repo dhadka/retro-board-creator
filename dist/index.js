@@ -2719,7 +2719,6 @@ function findLatestRetro(client, teamName, before) {
         core.info(`Found ${projects.data.length} projects in this repo`);
         const parseRetro = (proj) => {
             const info = parseProjectDescription(proj.body);
-            core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`);
             return {
                 title: proj.name,
                 url: proj.html_url,
@@ -2732,6 +2731,10 @@ function findLatestRetro(client, teamName, before) {
                 issue: info.issue
             };
         };
+        projects.data.forEach(proj => {
+            const info = parseProjectDescription(proj.body);
+            core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`);
+        });
         const sorted = projects.data
             .filter(proj => proj.body.startsWith(bodyPrefix))
             .map(proj => parseRetro(proj))
