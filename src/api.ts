@@ -88,7 +88,7 @@ export async function findLatestRetro(
     const response = result.data as Octokit.ProjectsListForRepoResponse
 
     if (response) {
-      core.info(`Processing ${response.length} projects`)
+      core.info(`Loading page containing ${response.length} projects`)
 
       response
         .filter(proj => proj.body.startsWith(bodyPrefix))

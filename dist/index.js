@@ -2743,7 +2743,7 @@ function findLatestRetro(client, teamName, before) {
                 const result = _c.value;
                 const response = result.data;
                 if (response) {
-                    core.info(`Processing ${response.length} projects`);
+                    core.info(`Loading page containing ${response.length} projects`);
                     response
                         .filter(proj => proj.body.startsWith(bodyPrefix))
                         .map(proj => parseRetro(proj))
@@ -5472,7 +5472,7 @@ function run() {
                 issueTemplate: utils_1.getString('issue-template', { default: defaults_1.defaultIssueTemplate }),
                 columns: utils_1.getList('columns'),
                 cards: utils_1.getString('cards'),
-                onlyLog: true // getBoolean('only-log')
+                onlyLog: utils_1.getBoolean('only-log')
             };
             core.info('Arguments parsed. Starting creation.');
             yield retro_1.tryCreateRetro(client, args);

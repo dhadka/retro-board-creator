@@ -24,7 +24,7 @@ async function run(): Promise<void> {
       issueTemplate: getString('issue-template', {default: defaultIssueTemplate}),
       columns: getList('columns'),
       cards: getString('cards'),
-      onlyLog: true // getBoolean('only-log')
+      onlyLog: getBoolean('only-log')
     }
 
     core.info('Arguments parsed. Starting creation.')
