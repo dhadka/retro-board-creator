@@ -82,7 +82,7 @@ export async function findLatestRetro(
     client.projects.listForRepo.endpoint.merge({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
-      state: "all"
+      state: 'all'
     })
   )) {
     const response = result.data as Octokit.ProjectsListForRepoResponse
@@ -90,12 +90,11 @@ export async function findLatestRetro(
     if (response) {
       core.info(`Loading page containing ${response.length} projects`)
 
-      response
-        .filter(proj => proj.body.startsWith(bodyPrefix))
-        .map(proj => parseRetro(proj))
-        .forEach(retro => retros.push(retro))
+      for (const retro of response.filter(proj => proj.body.startsWith(bodyPrefix)).map(proj => parseRetro(proj))) {
+        retros.push(retro)
+      }
     } else {
-      core.error(`Unexpected response: ${response}`)
+      core.error(`Unexpected response: ${result}`)
     }
   }
 

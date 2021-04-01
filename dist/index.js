@@ -2738,19 +2738,18 @@ function findLatestRetro(client, teamName, before) {
             for (var _b = __asyncValues(client.paginate.iterator(client.projects.listForRepo.endpoint.merge({
                 owner: github.context.repo.owner,
                 repo: github.context.repo.repo,
-                state: "all"
+                state: 'all'
             }))), _c; _c = yield _b.next(), !_c.done;) {
                 const result = _c.value;
                 const response = result.data;
                 if (response) {
                     core.info(`Loading page containing ${response.length} projects`);
-                    response
-                        .filter(proj => proj.body.startsWith(bodyPrefix))
-                        .map(proj => parseRetro(proj))
-                        .forEach(retro => retros.push(retro));
+                    for (const retro of response.filter(proj => proj.body.startsWith(bodyPrefix)).map(proj => parseRetro(proj))) {
+                        retros.push(retro);
+                    }
                 }
                 else {
-                    core.error(`Unexpected response: ${response}`);
+                    core.error(`Unexpected response: ${result}`);
                 }
             }
         }

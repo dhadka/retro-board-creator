@@ -295,7 +295,7 @@ describe('test findLatestRetro', () => {
 
   test('non-retrobot project', async () => {
     const scope = nock('https://api.github.com')
-      .get(`/repos/my-org/my-repo/projects`)
+      .get(`/repos/my-org/my-repo/projects?state=all`)
       .reply(200, [createProjectJson(1, 'my-project', 'Non-retrobot project', new Date())])
 
     const result = await findLatestRetro(client, 'Test Team')
@@ -305,7 +305,7 @@ describe('test findLatestRetro', () => {
 
   test('retrobot project', async () => {
     const scope = nock('https://api.github.com')
-      .get(`/repos/my-org/my-repo/projects`)
+      .get(`/repos/my-org/my-repo/projects?state=all`)
       .reply(200, [createProjectJson(1, 'my-project', 'Retrobot: {"team":"Test Team"}', new Date())])
 
     const result = await findLatestRetro(client, 'Test Team')
@@ -315,7 +315,7 @@ describe('test findLatestRetro', () => {
 
   test('retrobot project from different team', async () => {
     const scope = nock('https://api.github.com')
-      .get(`/repos/my-org/my-repo/projects`)
+      .get(`/repos/my-org/my-repo/projects?state=all`)
       .reply(200, [createProjectJson(1, 'my-project', 'Retrobot: {"team":"Other Team"}', new Date())])
 
     const result = await findLatestRetro(client, 'Test Team')
@@ -328,7 +328,7 @@ describe('test findLatestRetro', () => {
     const date2 = new Date('2020-09-20')
 
     const scope = nock('https://api.github.com')
-      .get(`/repos/my-org/my-repo/projects`)
+      .get(`/repos/my-org/my-repo/projects?state=all`)
       .reply(200, [
         createProjectJson(1, 'my-project', 'Retrobot: {"team":""}', date1),
         createProjectJson(2, 'my-project', 'Retrobot: {"team":"Test Team"}', date2)
@@ -345,7 +345,7 @@ describe('test findLatestRetro', () => {
     const date2 = new Date('2020-09-20')
 
     const scope = nock('https://api.github.com')
-      .get(`/repos/my-org/my-repo/projects`)
+      .get(`/repos/my-org/my-repo/projects?state=all`)
       .reply(200, [
         createProjectJson(1, 'my-project', `Retrobot: {"team":"Test Team", "date":"${date1}"}`, date1),
         createProjectJson(2, 'my-project', `Retrobot: {"team":"Test Team", "date":"${date2}"}`, date2)
@@ -362,7 +362,7 @@ describe('test findLatestRetro', () => {
     const date2 = new Date('2020-09-20')
 
     const scope = nock('https://api.github.com')
-      .get(`/repos/my-org/my-repo/projects`)
+      .get(`/repos/my-org/my-repo/projects?state=all`)
       .reply(200, [
         createProjectJson(1, 'my-project', `Retrobot: {"team":"Test Team", "date":"${date1}"}`, date1),
         createProjectJson(2, 'my-project', `Retrobot: {"team":"Test Team", "date":"${date2}"}`, date2)
