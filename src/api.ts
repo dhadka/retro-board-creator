@@ -71,6 +71,8 @@ export async function findLatestRetro(
   const parseRetro = (proj: Octokit.ProjectsListForRepoResponseItem): IRetro => {
     const info = parseProjectDescription(proj.body)
 
+    core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`)
+
     return {
       title: proj.name,
       url: proj.html_url,
