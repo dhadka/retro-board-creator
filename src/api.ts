@@ -62,7 +62,8 @@ export async function findLatestRetro(
 
   const projects = await client.projects.listForRepo({
     owner: github.context.repo.owner,
-    repo: github.context.repo.repo
+    repo: github.context.repo.repo,
+    state: "all"
   })
 
   core.info(`Found ${projects.data.length} projects in this repo`)
