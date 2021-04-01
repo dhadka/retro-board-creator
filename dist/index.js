@@ -2719,6 +2719,7 @@ function findLatestRetro(client, teamName, before) {
         core.info(`Found ${projects.data.length} projects in this repo`);
         const parseRetro = (proj) => {
             const info = parseProjectDescription(proj.body);
+            core.info(`> ${proj.name} ${proj.state} ${proj.body} ${info.date} ${info.team}`);
             return {
                 title: proj.name,
                 url: proj.html_url,
@@ -5444,7 +5445,7 @@ function run() {
                 issueTemplate: utils_1.getString('issue-template', { default: defaults_1.defaultIssueTemplate }),
                 columns: utils_1.getList('columns'),
                 cards: utils_1.getString('cards'),
-                onlyLog: utils_1.getBoolean('only-log')
+                onlyLog: true // getBoolean('only-log')
             };
             core.info('Arguments parsed. Starting creation.');
             yield retro_1.tryCreateRetro(client, args);
