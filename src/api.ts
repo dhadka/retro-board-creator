@@ -60,14 +60,6 @@ export async function findLatestRetro(
 ): Promise<IRetro | undefined> {
   core.info('Locating the last retro...')
 
-  const projects = await client.projects.listForRepo({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    state: "all"
-  })
-
-  core.info(`Found ${projects.data.length} projects in this repo`)
-
   const parseRetro = (proj: Octokit.ProjectsListForRepoResponseItem): IRetro => {
     const info = parseProjectDescription(proj.body)
 
@@ -84,15 +76,32 @@ export async function findLatestRetro(
     }
   }
 
-  projects.data.forEach(proj => {
-    core.info(`> ${proj.name} ${proj.state} ${proj.body}`)
-  })
+  const retros: IRetro[] = []
 
-  const sorted = projects.data
-    .filter(proj => proj.body.startsWith(bodyPrefix))
-    .map(proj => parseRetro(proj))
-    .filter(proj => (teamName ? teamName === proj.team : !proj.team))
-    .filter(proj => (before ? proj.date < before : true))
+  for await (const result of client.paginate.iterator(
+    client.projects.listForRepo.endpoint.merge({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      state: "all"
+    })
+  )) {
+    const response = result.data as Octokit.ProjectsListForRepoResponse
+
+    if (response) {
+      core.info(`Processing ${response.length} projects`)
+
+      response
+        .filter(proj => proj.body.startsWith(bodyPrefix))
+        .map(proj => parseRetro(proj))
+        .forEach(retro => retros.push(retro))
+    } else {
+      core.error(`Unexpected response: ${response}`)
+    }
+  }
+
+  const sorted = retros
+    .filter(retro => (teamName ? teamName === retro.team : !retro.team))
+    .filter(retro => (before ? retro.date < before : true))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .reverse()
 
