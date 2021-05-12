@@ -11,8 +11,7 @@ Best Regards,
 Retrobot`
 
 export const defaultNotificationTemplate =
-  //'<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
-  'A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}'
+  '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}'
 
 export const defaultNotificationEmoji = ':rocket:'
 

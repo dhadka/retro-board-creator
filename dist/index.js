@@ -10789,9 +10789,7 @@ Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
 Best Regards,
 
 Retrobot`;
-exports.defaultNotificationTemplate = 
-//'<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
-'A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}';
+exports.defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}';
 exports.defaultNotificationEmoji = ':rocket:';
 exports.defaultColumnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
 
