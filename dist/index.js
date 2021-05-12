@@ -3014,7 +3014,7 @@ function sendNotification(notificationUrl, notificationTemplate, view, onlyLog) 
                 username: 'Retrobot',
                 text: mustache.render(notificationTemplate, view),
                 icon_emoji: defaults_1.defaultNotificationEmoji,
-                link_names: 1
+                link_names: true
             };
             const res = yield axios_1.default.post(notificationUrl, body);
             core.info(res.statusText);
@@ -10789,7 +10789,9 @@ Need help? Found a bug? Visit https://github.com/dhadka/retrobot.
 Best Regards,
 
 Retrobot`;
-exports.defaultNotificationTemplate = '<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.';
+exports.defaultNotificationTemplate = 
+//'<!here|here> A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}.'
+'A retro is scheduled for today! Visit <{{{ url }}}|the retro board> to add your cards. CC retro driver @{{ driver }}';
 exports.defaultNotificationEmoji = ':rocket:';
 exports.defaultColumnNames = ['Went well', 'Went meh', 'Could have gone better', 'Action items!'];
 
