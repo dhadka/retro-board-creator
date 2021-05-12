@@ -391,7 +391,7 @@ export async function sendNotification(
       username: 'Retrobot',
       text: mustache.render(notificationTemplate, view),
       icon_emoji: defaultNotificationEmoji,
-      link_names: 1
+      link_names: true
     }
 
     const res = await axios.post(notificationUrl, body)
