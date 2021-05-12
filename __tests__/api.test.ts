@@ -540,7 +540,7 @@ describe('test sendNotification', () => {
         username: 'Retrobot',
         text: 'Test Notification',
         icon_emoji: defaultNotificationEmoji,
-        link_names: 1
+        link_names: true
       })
       .reply(200)
 
@@ -559,7 +559,7 @@ describe('test sendNotification', () => {
         username: 'Retrobot',
         text: 'foo',
         icon_emoji: defaultNotificationEmoji,
-        link_names: 1
+        link_names: true
       })
       .reply(200)
 
